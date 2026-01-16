@@ -1,5 +1,5 @@
-> [!NOTE]  
-> If you are looking for IIAB on Android's underlying Termux `proot_services` infra, please [check here](https://github.com/iiab/iiab/tree/master/roles/proot_services).
+> [!NOTE]
+> Looking for IIAB on Android's underlying Termux `proot_services` infra? [Check here!](https://github.com/iiab/iiab/tree/master/roles/proot_services)
 
 # Internet-in-a-Box on Android
 
