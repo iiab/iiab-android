@@ -30,7 +30,7 @@ This repo hosts the Android bootstrap (termux-setup), wrapper tooling, and docs,
 ## What are the current components of "IIAB on Android"?
 
 - **termux-setup** (Android-side bootstrap and prerequisites)
-- **IIAB installer wrapper (`1_iiab-on-android`)** (sets up Android-specific `local_vars_android.yml` and launches the standard IIAB installer)
+- **IIAB installer wrapper (`1_iiab-on-android`)** (sets up specific `local_vars_android.yml`, requirements  and launches the IIAB installer)
 - **Core IIAB portability layer** (changes across core IIAB and existing roles, e.g. PR #4122)
 - **proot-distro service manager** (PDSM / `proot_services`) to run services without systemd
 
