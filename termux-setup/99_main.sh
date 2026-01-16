@@ -67,8 +67,8 @@ Usage:
 
 Notes:
 - ADB prompts require: `pkg install termux-api` + Termux:API app installed + notification permission.
-- Wireless debugging must be enabled.
-- This script never uses adb root.
+- Wireless debugging must be enabled on Android 12 & 13
+- This script doesn't use adb root.
 EOF
 }
 
