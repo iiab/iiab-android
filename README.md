@@ -1,7 +1,14 @@
-> [!NOTE]
-> Looking for IIAB on Android's underlying Termux `proot_services` infra? [Check here!](https://github.com/iiab/iiab/tree/master/roles/proot_services)
-
 # Internet-in-a-Box on Android
+
+## :world_map: Start here
+
+- **This repo (overview):** you are here, IIAB on Android: termux bootstrap, docs, wrapper & tooling
+- **Android bootstrap:** [`termux-setup/README.md`](./termux-setup/README.md)
+- **proot_services role (at main IIAB repo):** [`roles/proot_services/README.md`](https://github.com/iiab/iiab/blob/master/roles/proot_services/README.md)
+
+## What is "IIAB on Android"
+
+**IIAB on Android:** Let's run Internet-in-a-Box on Android via Termux + proot-distro.
 
 [Internet-in-a-Box (IIAB)](https://internet-in-a-box.org) on Android means that millions of people worldwide can build their own family libraries, inside their own phones.
 
@@ -18,8 +25,18 @@ The default port for the web server is **8085**, for example:
 ```
 http://localhost:8085/maps
 ```
+This repo hosts the Android bootstrap (termux-setup), wrapper tooling, and docs, while the proot_services role lives in the main IIAB repo.
 
-## Installation
+## What are the current components of "IIAB on Android"?
+
+- **termux-setup** (Android-side bootstrap and prerequisites)
+- **IIAB installer wrapper (`1_iiab-on-android`)** (sets up Android-specific `local_vars_android.yml` and launches the standard IIAB installer)
+- **Core IIAB portability layer** (changes across core IIAB and existing roles, e.g. PR #4122)
+- **proot-distro service manager** (PDSM / `proot_services`) to run services without systemd
+
+---
+
+## :clipboard: Installation guide
 
 1. Start with an Android 12-or-higher phone or tablet:
 
