@@ -1,14 +1,22 @@
+## Where am I?
+
+This README covers the **Android/Termux-side** setup development (before actually installing IIAB).
+
+- :world_map: **Start here to get the overall picture:** [`iiab-android/README.md`](../README.md)
+- **IIAB-side services in PRoot-Distro (`proot_services` role):**
+  https://github.com/iiab/iiab/blob/master/roles/proot_services/README.md
+
 # termux-setup modules
 
-Welcome to the termux-setup modular "suite", these scripts are intended to help the development
-of the termux seupt process into a ready to install IIAB state usually.
+Welcome to the **termux-setup** modular “suite”. These scripts help evolve the Termux setup
+process into a **ready-to-install IIAB** state.
 
-In order to look for instructions on how to install IIAB on Android, please
-use the instructions listed at this [README.md](https://github.com/iiab/iiab-android/blob/main/README.md).
+For full instructions on how to install IIAB on Android, see the main overview:
+[`iiab-android/README.md`](https://github.com/iiab/iiab-android/blob/main/README.md).
 
-## Usage for 0_termux-setup.sh
+## Usage for `0_termux-setup.sh`
 
-Here a summary of the `0_termux-setup.sh ` usage:
+Here is a summary of `0_termux-setup.sh` usage:
 
 ```
 Usage:
