@@ -8,11 +8,13 @@ This README covers the **Android/Termux-side** setup development (before actuall
 
 # termux-setup modules
 
-Welcome to the **termux-setup** modular “suite”. These scripts help evolve the Termux setup
+Welcome to the **termux-setup** modular "suite". These scripts help evolve the Termux setup
 process into a **ready-to-install IIAB** state.
 
 For full instructions on how to install IIAB on Android, see the main overview:
 [`iiab-android/README.md`](https://github.com/iiab/iiab-android/blob/main/README.md).
+
+We invite you to continue reading to find out more about the usage, components and development for `0_termux-setup.sh` script.
 
 ## Usage for `0_termux-setup.sh`
 
