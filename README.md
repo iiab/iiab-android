@@ -8,9 +8,7 @@
 
 ## What is "IIAB on Android"
 
-**IIAB on Android:** Let's run Internet-in-a-Box on Android via Termux + proot-distro.
-
-[Internet-in-a-Box (IIAB)](https://internet-in-a-box.org) on Android means that millions of people worldwide can build their own family libraries, inside their own phones.
+**[Internet-in-a-Box (IIAB)](https://internet-in-a-box.org) on Android** let's run Internet-in-a-Box on Android via Termux + proot-distro. It means that millions of people worldwide can build their own family libraries, inside their own phones.
 
 As of January 2026, these IIAB Apps are supported:
 
