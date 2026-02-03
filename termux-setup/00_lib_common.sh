@@ -63,6 +63,12 @@ tty_prompt_print() {
   printf '%b' "$prompt" >&"$outfd"
 }
 
+fd3_available() { : >&3 2>/dev/null; }
+fd4_available() { : >&4 2>/dev/null; }
+
+console_outfd() { fd3_available && echo 3 || echo 1; }
+console_errfd() { fd4_available && echo 4 || echo 2; }
+
 tty_yesno_default_y() {
   # args: prompt
   # Returns 0 for Yes, 1 for No. Default is Yes.
@@ -128,7 +134,9 @@ iiab_login() {
           if [[ -r /dev/tty ]]; then
             read -r _ </dev/tty || true
           else
-            printf "\n" >&3
+            local outfd
+            outfd="$(console_outfd)"
+            printf "\n" >&"$outfd"
           fi
           date > "$bst" 2>/dev/null || true
         else
@@ -174,8 +182,12 @@ iiab_login() {
   power_mode_login_enter || true
   # Preserve interactivity even if logging is enabled (avoid pipes/tee issues).
   local rc=0
+  local outfd errfd
+  outfd="$(console_outfd)"
+  errfd="$(console_errfd)"
+
   if [[ -r /dev/tty ]]; then
-    proot-distro login iiab </dev/tty >&3 2>&4
+    proot-distro login iiab </dev/tty >&"$outfd" 2>&"$errfd"
     rc=$?
   else
     proot-distro login iiab

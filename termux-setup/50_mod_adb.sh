@@ -19,13 +19,11 @@ ADB_CODE_TIMEOUT_SECS="${ADB_CODE_TIMEOUT_SECS:-90}"
 ADB_HINT_NOTIF_ID="${ADB_HINT_NOTIF_ID:-$((NOTIF_BASE_ID + 30))}"
 
 adb_local_ipv4s_csv() {
-  # Used to reduce the chance of picking another device on the LAN.
-  # If we cannot detect local IPs, we still try (less safe).
-  if have ifconfig; then
-    ifconfig 2>/dev/null | awk '/inet / && $2!="127.0.0.1"{print $2}' | paste -sd, - 2>/dev/null || true
-  else
-    :
-  fi
+  termux-wifi-connectioninfo 2>/dev/null \
+    | jq -r '.ip // empty' \
+    | awk 'NF && $0!="127.0.0.1"{print $0}' \
+    | paste -sd, - 2>/dev/null \
+    || true
 }
 
 adb_hint_notif_post() {

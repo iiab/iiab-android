@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# GENERATED FILE: 2026-02-03T00:54:14-06:00 - do not edit directly.
+# GENERATED FILE: 2026-02-03T04:11:56-06:00 - do not edit directly.
 # Source modules: termux-setup/*.sh + manifest.sh
 # Rebuild: (cd termux-setup && bash build_bundle.sh)
 # -----------------------------------------------------------------------------
@@ -74,6 +74,12 @@ tty_prompt_print() {
   printf '%b' "$prompt" >&"$outfd"
 }
 
+fd3_available() { : >&3 2>/dev/null; }
+fd4_available() { : >&4 2>/dev/null; }
+
+console_outfd() { fd3_available && echo 3 || echo 1; }
+console_errfd() { fd4_available && echo 4 || echo 2; }
+
 tty_yesno_default_y() {
   # args: prompt
   # Returns 0 for Yes, 1 for No. Default is Yes.
@@ -139,7 +145,9 @@ iiab_login() {
           if [[ -r /dev/tty ]]; then
             read -r _ </dev/tty || true
           else
-            printf "\n" >&3
+            local outfd
+            outfd="$(console_outfd)"
+            printf "\n" >&"$outfd"
           fi
           date > "$bst" 2>/dev/null || true
         else
@@ -185,8 +193,12 @@ iiab_login() {
   power_mode_login_enter || true
   # Preserve interactivity even if logging is enabled (avoid pipes/tee issues).
   local rc=0
+  local outfd errfd
+  outfd="$(console_outfd)"
+  errfd="$(console_errfd)"
+
   if [[ -r /dev/tty ]]; then
-    proot-distro login iiab </dev/tty >&3 2>&4
+    proot-distro login iiab </dev/tty >&"$outfd" 2>&"$errfd"
     rc=$?
   else
     proot-distro login iiab
@@ -291,6 +303,10 @@ setup_logging() {
 
 TERMUX_ZEROCONF_STAMP="${STATE_DIR}/stamp.termux_zeroconf"
 
+# Cache: avoid repeating zeroconf checks/installs/warnings in the same run.
+PY_ZEROCONF_CHECKED=0
+PY_ZEROCONF_OK=0
+
 python_cmd() {
   command -v python 2>/dev/null || command -v python3 2>/dev/null || true
 }
@@ -308,8 +324,12 @@ python_pip_install_zeroconf() {
   [[ -n "$py" ]] || return 1
   # Some environments may lack pip initially; try ensurepip if available.
   if ! "$py" -m pip --version >/dev/null 2>&1; then
-    "$py" -m ensurepip --upgrade || return 1
-    "$py" -m pip --version || return 1
+    if "$py" -c 'import ensurepip' >/dev/null 2>&1; then
+      "$py" -m ensurepip --upgrade || return 1
+      "$py" -m pip --version || return 1
+    else
+      return 1
+    fi
   fi
   # Run pip directly on the real TTY when FD 3/4 are available.
   if : >&3 2>/dev/null && : >&4 2>/dev/null; then
@@ -320,19 +340,33 @@ python_pip_install_zeroconf() {
 }
 
 python_ensure_zeroconf() {
-  # Android < 11 does not use Wireless debugging pairing; skip mDNS prep.
-  if [[ "${ANDROID_SDK:-}" =~ ^[0-9]+$ ]] && (( ANDROID_SDK < 30 )); then
+  # Fast path: if we already decided in this run, return the same result.
+  if [[ "${PY_ZEROCONF_CHECKED:-0}" -eq 1 ]]; then
+    [[ "${PY_ZEROCONF_OK:-0}" -eq 1 ]] && return 0
     return 1
   fi
-  python_has_zeroconf && return 0
-  [[ "${ADB_MDNS_PIP_INSTALL:-1}" -eq 1 ]] || return 1
+
+  PY_ZEROCONF_CHECKED=1
+
+  # Android < 11 does not use Wireless debugging pairing; skip mDNS prep.
+  if [[ "${ANDROID_SDK:-}" =~ ^[0-9]+$ ]] && (( ANDROID_SDK < 30 )); then
+    PY_ZEROCONF_OK=0
+    return 1
+  fi
+  if python_has_zeroconf; then
+    PY_ZEROCONF_OK=1
+    return 0
+  fi
+  [[ "${ADB_MDNS_PIP_INSTALL:-1}" -eq 1 ]] || { PY_ZEROCONF_OK=0; return 1; }
 
   warn "Python module 'zeroconf' not found. Trying to install it: python -m pip install --upgrade zeroconf"
   if python_pip_install_zeroconf && python_has_zeroconf; then
     ok "Installed Python module 'zeroconf' (mDNS autodetect enabled)."
+    PY_ZEROCONF_OK=1
     return 0
   fi
   warn "Could not install 'zeroconf' (no network, pip missing, or install failed). Falling back to manual prompts."
+  PY_ZEROCONF_OK=0
   return 1
 }
 
@@ -349,18 +383,13 @@ termux_prepare_mdns_deps() {
   fi
   # If stamp exists but module disappeared, drop stamp and retry.
   [[ -f "$TERMUX_ZEROCONF_STAMP" ]] && rm -f "$TERMUX_ZEROCONF_STAMP" >/dev/null 2>&1 || true
-  if python_has_zeroconf; then
-    ok "mDNS autodetect dependency already present (python: zeroconf)."
-    date > "$TERMUX_ZEROCONF_STAMP" 2>/dev/null || true
-    return 0
-  fi
 
   log "Preparing mDNS autodetect dependency (python module: zeroconf)..."
-  if python_pip_install_zeroconf && python_has_zeroconf; then
-    ok "mDNS autodetect dependency ready (zeroconf)."
+  if python_ensure_zeroconf; then
     date > "$TERMUX_ZEROCONF_STAMP" 2>/dev/null || true
   else
-    warn "Could not prepare 'zeroconf' during baseline. mDNS autodetect may fall back to manual prompts."
+    # python_ensure_zeroconf already warned; keep this generic to avoid duplicates.
+    warn "mDNS autodetect may fall back to manual prompts."
   fi
   return 0
 }
@@ -526,11 +555,15 @@ power_mode_offer_battery_settings_once() {
 
   if tty_yesno_default_y "${YEL}[iiab] Open Termux App info to adjust Battery policy? [Y/n]: ${RST}"; then
     if android_open_termux_app_info; then
-      printf "[iiab] When done, return to Termux and press Enter to continue... " >&3
+      local outfd
+      outfd="$(console_outfd)"
+      printf "[iiab] When done, return to Termux and press Enter to continue... " >&"$outfd"
       if [[ -r /dev/tty ]]; then
         read -r _ </dev/tty || true
       else
-        printf "\n" >&3
+        local outfd
+        outfd="$(console_outfd)"
+        printf "\n" >&"$outfd"
       fi
       date > "$stamp" 2>/dev/null || true
     else
@@ -558,19 +591,22 @@ step_termux_repo_select_once() {
   fi
 
   local did_run=0
+  local outfd errfd
+  outfd="$(console_outfd)"
+  errfd="$(console_errfd)"
 
   if [[ -r /dev/tty ]]; then
-    printf "\n${YEL}[iiab] One-time setup:${RST} Select a nearby Termux repository mirror for faster downloads.\n"
+    printf "\n${YEL}[iiab] One-time setup:${RST} Select a nearby Termux repository mirror for faster downloads.\n" >&"$outfd"
     local ans="Y"
-    printf "[iiab] Launch termux-change-repo now? [Y/n]: "
+    printf "[iiab] Launch termux-change-repo now? [Y/n]: " >&"$outfd"
     if ! IFS= read -r ans < /dev/tty; then
       warn "No interactive TTY available; skipping mirror selection (run 'termux-change-repo' directly to be prompted)."
       return 0
     fi
     ans="${ans:-Y}"
     if [[ "$ans" =~ ^[Yy]$ ]]; then
-      # Run interactive UI against /dev/tty and original console fds (3/4).
-      if termux-change-repo </dev/tty >&3 2>&4; then
+      # Run interactive UI against /dev/tty and the current console fds (works w/ or w/o logging).
+      if termux-change-repo </dev/tty >&"$outfd" 2>&"$errfd"; then
         did_run=1
       fi
       ok "Mirror selection completed (or skipped inside the UI)."
@@ -578,7 +614,7 @@ step_termux_repo_select_once() {
       warn "Mirror selection skipped by user."
     fi
     if (( did_run )); then
-      date > "$stamp"
+      date > "$stamp" 2>/dev/null || true
     else
       warn "Mirror not selected yet; you'll be asked again next run."
     fi
@@ -632,6 +668,7 @@ step_termux_base() {
     curl
     gawk
     grep
+    jq
     openssh
     proot
     proot-distro
@@ -666,7 +703,10 @@ step_termux_base() {
 # -------------------------
 step_termux_python_zeroconf() {
   baseline_need_python || return 0
-  [[ -f "$TERMUX_ZEROCONF_STAMP" ]] && return 0
+  if [[ -f "$TERMUX_ZEROCONF_STAMP" ]] && python_has_zeroconf; then
+    return 0
+  fi
+  [[ -f "$TERMUX_ZEROCONF_STAMP" ]] && rm -f "$TERMUX_ZEROCONF_STAMP" >/dev/null 2>&1 || true
 
   if ! have python; then
     warn "Android 11+: python is expected but missing; skipping zeroconf prep."
@@ -1046,13 +1086,11 @@ ADB_CODE_TIMEOUT_SECS="${ADB_CODE_TIMEOUT_SECS:-90}"
 ADB_HINT_NOTIF_ID="${ADB_HINT_NOTIF_ID:-$((NOTIF_BASE_ID + 30))}"
 
 adb_local_ipv4s_csv() {
-  # Used to reduce the chance of picking another device on the LAN.
-  # If we cannot detect local IPs, we still try (less safe).
-  if have ifconfig; then
-    ifconfig 2>/dev/null | awk '/inet / && $2!="127.0.0.1"{print $2}' | paste -sd, - 2>/dev/null || true
-  else
-    :
-  fi
+  termux-wifi-connectioninfo 2>/dev/null \
+    | jq -r '.ip // empty' \
+    | awk 'NF && $0!="127.0.0.1"{print $0}' \
+    | paste -sd, - 2>/dev/null \
+    || true
 }
 
 adb_hint_notif_post() {
@@ -1721,6 +1759,84 @@ self_check_android_flags() {
 # ---- END 60_mod_ppk_checks.sh ----
 
 
+# ---- BEGIN 70_mod_install_iiab_android.sh ----
+# shellcheck shell=bash
+# Module file (no shebang). Bundled by build_bundle.sh
+
+install_iiab_android_cmd() {
+  have proot-distro || die "proot-distro not found"
+  iiab_exists || { warn_red "IIAB Debian (alias 'iiab') not installed."; return 1; }
+
+  local url="${IIAB_ANDROID_URL:-https://raw.githubusercontent.com/iiab/iiab-android/main/iiab-android}"
+  local dest="${IIAB_ANDROID_DEST:-/usr/local/sbin/iiab-android}"
+  local tmp="/tmp/iiab-android.$$"
+
+  local meta old new rc=0
+  set +e
+  meta="$(proot-distro login iiab -- env URL="$url" DEST="$dest" TMP="$tmp" bash -lc '
+    set -e
+    old=""
+    if [ -r "$DEST" ]; then old="$(sha256sum "$DEST" 2>/dev/null | cut -d" " -f1 || true)"; fi
+    if ! command -v curl >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold install ca-certificates curl coreutils
+    fi
+    curl -fsSL --retry 5 --retry-connrefused --retry-delay 2 "$URL" -o "$TMP"
+    head -n1 "$TMP" | grep -q "bash" || { echo "BAD_SHEBANG"; exit 2; }
+    new="$(sha256sum "$TMP" | cut -d" " -f1)"
+    echo "OLD=$old"
+    echo "NEW=$new"
+  ' 2>&1)"
+  rc=$?
+  set -e
+
+  if (( rc != 0 )); then
+    if printf '%s\n' "$meta" | grep -q 'BAD_SHEBANG'; then
+      warn_red "Downloaded iiab-android does not look like a bash script (bad shebang)."
+    else
+      warn_red "Failed to fetch/install iiab-android in proot (rc=$rc)."
+      printf "%s\n" "$meta" | indent >&2
+    fi
+    return 1
+  fi
+
+  old="$(printf '%s\n' "$meta" | sed -n 's/^OLD=//p' | head -n1)"
+  new="$(printf '%s\n' "$meta" | sed -n 's/^NEW=//p' | head -n1)"
+
+  if [[ -n "$old" && "$old" == "$new" ]]; then
+    ok "iiab-android already up to date inside proot."
+    proot-distro login iiab -- env TMP="$tmp" bash -lc 'rm -f "$TMP" >/dev/null 2>&1 || true' || true
+    return 0
+  fi
+
+  if [[ -n "$old" && "$old" != "$new" ]]; then
+    warn "iiab-android exists and differs inside proot."
+    if ! tty_yesno_default_n "[iiab] Replace existing iiab-android inside proot? [y/N]: "; then
+      warn "Keeping existing iiab-android."
+      proot-distro login iiab -- env TMP="$tmp" bash -lc 'rm -f "$TMP" >/dev/null 2>&1 || true' || true
+     return 0
+    fi
+  fi
+
+  proot-distro login iiab -- env DEST="$dest" TMP="$tmp" bash -lc '
+    set -e
+    mkdir -p "$(dirname "$DEST")"
+    if [ -f "$DEST" ]; then
+      ts="$(date +%Y%m%d-%H%M%S 2>/dev/null || echo now)"
+      mv -f "$DEST" "${DEST}.old.${ts}" 2>/dev/null || true
+    fi
+    install -m 0755 "$TMP" "$DEST"
+    rm -f "$TMP" >/dev/null 2>&1 || true
+  ' || { warn_red "Failed to finalize iiab-android install inside proot."; return 1; }
+
+  ok "Installed inside proot: $dest"
+  ok "Next (inside proot): iiab-android"
+}
+
+# ---- END 70_mod_install_iiab_android.sh ----
+
+
 # ---- BEGIN 99_main.sh ----
 # shellcheck shell=bash
 # Module file (no shebang). Bundled by build_bundle.sh
@@ -2067,79 +2183,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-install_iiab_android_cmd() {
-  have proot-distro || die "proot-distro not found"
-  iiab_exists || { warn_red "IIAB Debian (alias 'iiab') not installed."; return 1; }
+all_optional_adb_connect_and_check() {
+  # Args:
+  #   $1 = label (e.g. "Android 14+" or "Android 11")
+  #   $2 = reminder line (can be "")
 
-  local url="${IIAB_ANDROID_URL:-https://raw.githubusercontent.com/iiab/iiab-android/main/iiab-android}"
-  local dest="${IIAB_ANDROID_DEST:-/usr/local/sbin/iiab-android}"
-  local tmp="/tmp/iiab-android.$$"
+  local label="${1:-Android}"
+  local reminder="${2:-}"
 
-  local meta old new rc=0
-  set +e
-  meta="$(proot-distro login iiab -- env URL="$url" DEST="$dest" TMP="$tmp" bash -lc '
-    set -e
-    old=""
-    if [ -r "$DEST" ]; then old="$(sha256sum "$DEST" 2>/dev/null | cut -d" " -f1 || true)"; fi
-    if ! command -v curl >/dev/null 2>&1; then
-      export DEBIAN_FRONTEND=noninteractive
-      apt-get update
-      apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold install ca-certificates curl coreutils
-    fi
-    curl -fsSL --retry 5 --retry-connrefused --retry-delay 2 "$URL" -o "$TMP"
-    head -n1 "$TMP" | grep -q "bash" || { echo "BAD_SHEBANG"; exit 2; }
-    new="$(sha256sum "$TMP" | cut -d" " -f1)"
-    echo "OLD=$old"
-    echo "NEW=$new"
-  ' 2>&1)"
-  rc=$?
-  set -e
-
-  if (( rc != 0 )); then
-    if printf '%s\n' "$meta" | grep -q 'BAD_SHEBANG'; then
-      warn_red "Downloaded iiab-android does not look like a bash script (bad shebang)."
-    else
-      warn_red "Failed to fetch/install iiab-android in proot (rc=$rc)."
-      printf "%s\n" "$meta" | indent >&2
-    fi
-    return 1
-  fi
-
-  old="$(printf '%s\n' "$meta" | sed -n 's/^OLD=//p' | head -n1)"
-  new="$(printf '%s\n' "$meta" | sed -n 's/^NEW=//p' | head -n1)"
-
-  if [[ -n "$old" && "$old" == "$new" ]]; then
-    ok "iiab-android already up to date inside proot."
-    proot-distro login iiab -- env TMP="$tmp" bash -lc 'rm -f "$TMP" >/dev/null 2>&1 || true' || true
-    return 0
-  fi
-
-  if [[ -n "$old" && "$old" != "$new" ]]; then
-    warn "iiab-android exists and differs inside proot."
-    if ! tty_yesno_default_n "[iiab] Replace existing iiab-android inside proot? [y/N]: "; then
-      warn "Keeping existing iiab-android."
-      proot-distro login iiab -- env TMP="$tmp" bash -lc 'rm -f "$TMP" >/dev/null 2>&1 || true' || true
-     return 0
-    fi
-  fi
-
-  proot-distro login iiab -- env DEST="$dest" TMP="$tmp" bash -lc '
-    set -e
-    mkdir -p "$(dirname "$DEST")"
-    if [ -f "$DEST" ]; then
-      ts="$(date +%Y%m%d-%H%M%S 2>/dev/null || echo now)"
-      mv -f "$DEST" "${DEST}.old.${ts}" 2>/dev/null || true
-    fi
-    install -m 0755 "$TMP" "$DEST"
-    rm -f "$TMP" >/dev/null 2>&1 || true
-  ' || { warn_red "Failed to finalize iiab-android install inside proot."; return 1; }
-
-  ok "Installed inside proot: $dest"
-  ok "Next (inside proot): iiab-android"
-}
-
-all_a14plus_optional_adb() {
-  # Android 14+: ADB is optional. If already connected, run checks (no prompts).
   local serial=""
 
   if have adb; then
@@ -2151,15 +2202,14 @@ all_a14plus_optional_adb() {
     fi
   fi
 
-  # Not connected -> offer ADB (recommended)
-  if tty_yesno_default_y "[iiab] Android 14+: Connect via Wireless ADB now (recommended)? [Y/n]: "; then
+  if tty_yesno_default_y "[iiab] ${label}: Connect via Wireless ADB now (recommended)? [Y/n]: "; then
     adb_pair_connect_if_needed
     check_readiness || true
     return 0
   fi
 
-  warn "Continuing without ADB (Android 14+)."
-  warn "Reminder: enable Developer Options -> 'Disable child process restrictions' (otherwise installs may fail)."
+  warn "Continuing without ADB (${label})."
+  [[ -n "$reminder" ]] && warn "$reminder"
   CHECK_NO_ADB=1
   CHECK_SDK="${ANDROID_SDK:-}"
   return 0
@@ -2177,32 +2227,6 @@ warn_skip_adb_pre11() {
 warn_adb_only_pre11() {
   warn "Android 8-10: --adb-only cannot run Wireless debugging pairing (Android 11+ feature)."
   warn "So far, our testing indicates ADB is not required on Android 8-10."
-}
-
-all_a11_optional_adb() {
-  # Android 11: ADB is optional. If already connected, run checks (no prompts).
-  local serial=""
-  if have adb; then
-    adb start-server >/dev/null 2>&1 || true
-    if serial="$(adb_pick_loopback_serial 2>/dev/null)"; then
-      ok "ADB already connected: $serial (running checks, no prompts)."
-      check_readiness || true
-      return 0
-    fi
-  fi
-
-  # Not connected -> offer ADB (recommended, but optional)
-  if tty_yesno_default_y "[iiab] Android 11: Connect via Wireless ADB now (recommended)? [Y/n]: "; then
-    adb_pair_connect_if_needed
-    check_readiness || true
-    return 0
-  fi
-
-  warn "Continuing without ADB (Android 11)."
-  warn "Note: Wireless debugging is optional here; installs usually work without ADB."
-  CHECK_NO_ADB=1
-  CHECK_SDK="${ANDROID_SDK:-}"
-  return 0
 }
 
 validate_args() {
@@ -2321,10 +2345,14 @@ main() {
       install_iiab_android_cmd || true
       if sdk_is_num && (( ANDROID_SDK >= 34 )); then
         # Android 14+
-        all_a14plus_optional_adb
+        all_optional_adb_connect_and_check \
+          "Android 14+" \
+          "Reminder: enable Developer Options -> 'Disable child process restrictions' (otherwise installs may fail)."
       elif sdk_eq 30; then
         # Android 11
-        all_a11_optional_adb
+        all_optional_adb_connect_and_check \
+          "Android 11" \
+          "Note: Wireless debugging is optional here; installs usually work without ADB."
       elif sdk_le 29; then
         # Android 8-10
         warn_skip_adb_pre11

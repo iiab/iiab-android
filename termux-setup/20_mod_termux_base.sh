@@ -8,6 +8,10 @@
 
 TERMUX_ZEROCONF_STAMP="${STATE_DIR}/stamp.termux_zeroconf"
 
+# Cache: avoid repeating zeroconf checks/installs/warnings in the same run.
+PY_ZEROCONF_CHECKED=0
+PY_ZEROCONF_OK=0
+
 python_cmd() {
   command -v python 2>/dev/null || command -v python3 2>/dev/null || true
 }
@@ -25,8 +29,12 @@ python_pip_install_zeroconf() {
   [[ -n "$py" ]] || return 1
   # Some environments may lack pip initially; try ensurepip if available.
   if ! "$py" -m pip --version >/dev/null 2>&1; then
-    "$py" -m ensurepip --upgrade || return 1
-    "$py" -m pip --version || return 1
+    if "$py" -c 'import ensurepip' >/dev/null 2>&1; then
+      "$py" -m ensurepip --upgrade || return 1
+      "$py" -m pip --version || return 1
+    else
+      return 1
+    fi
   fi
   # Run pip directly on the real TTY when FD 3/4 are available.
   if : >&3 2>/dev/null && : >&4 2>/dev/null; then
@@ -37,19 +45,33 @@ python_pip_install_zeroconf() {
 }
 
 python_ensure_zeroconf() {
-  # Android < 11 does not use Wireless debugging pairing; skip mDNS prep.
-  if [[ "${ANDROID_SDK:-}" =~ ^[0-9]+$ ]] && (( ANDROID_SDK < 30 )); then
+  # Fast path: if we already decided in this run, return the same result.
+  if [[ "${PY_ZEROCONF_CHECKED:-0}" -eq 1 ]]; then
+    [[ "${PY_ZEROCONF_OK:-0}" -eq 1 ]] && return 0
     return 1
   fi
-  python_has_zeroconf && return 0
-  [[ "${ADB_MDNS_PIP_INSTALL:-1}" -eq 1 ]] || return 1
+
+  PY_ZEROCONF_CHECKED=1
+
+  # Android < 11 does not use Wireless debugging pairing; skip mDNS prep.
+  if [[ "${ANDROID_SDK:-}" =~ ^[0-9]+$ ]] && (( ANDROID_SDK < 30 )); then
+    PY_ZEROCONF_OK=0
+    return 1
+  fi
+  if python_has_zeroconf; then
+    PY_ZEROCONF_OK=1
+    return 0
+  fi
+  [[ "${ADB_MDNS_PIP_INSTALL:-1}" -eq 1 ]] || { PY_ZEROCONF_OK=0; return 1; }
 
   warn "Python module 'zeroconf' not found. Trying to install it: python -m pip install --upgrade zeroconf"
   if python_pip_install_zeroconf && python_has_zeroconf; then
     ok "Installed Python module 'zeroconf' (mDNS autodetect enabled)."
+    PY_ZEROCONF_OK=1
     return 0
   fi
   warn "Could not install 'zeroconf' (no network, pip missing, or install failed). Falling back to manual prompts."
+  PY_ZEROCONF_OK=0
   return 1
 }
 
@@ -66,18 +88,13 @@ termux_prepare_mdns_deps() {
   fi
   # If stamp exists but module disappeared, drop stamp and retry.
   [[ -f "$TERMUX_ZEROCONF_STAMP" ]] && rm -f "$TERMUX_ZEROCONF_STAMP" >/dev/null 2>&1 || true
-  if python_has_zeroconf; then
-    ok "mDNS autodetect dependency already present (python: zeroconf)."
-    date > "$TERMUX_ZEROCONF_STAMP" 2>/dev/null || true
-    return 0
-  fi
 
   log "Preparing mDNS autodetect dependency (python module: zeroconf)..."
-  if python_pip_install_zeroconf && python_has_zeroconf; then
-    ok "mDNS autodetect dependency ready (zeroconf)."
+  if python_ensure_zeroconf; then
     date > "$TERMUX_ZEROCONF_STAMP" 2>/dev/null || true
   else
-    warn "Could not prepare 'zeroconf' during baseline. mDNS autodetect may fall back to manual prompts."
+    # python_ensure_zeroconf already warned; keep this generic to avoid duplicates.
+    warn "mDNS autodetect may fall back to manual prompts."
   fi
   return 0
 }
@@ -243,11 +260,15 @@ power_mode_offer_battery_settings_once() {
 
   if tty_yesno_default_y "${YEL}[iiab] Open Termux App info to adjust Battery policy? [Y/n]: ${RST}"; then
     if android_open_termux_app_info; then
-      printf "[iiab] When done, return to Termux and press Enter to continue... " >&3
+      local outfd
+      outfd="$(console_outfd)"
+      printf "[iiab] When done, return to Termux and press Enter to continue... " >&"$outfd"
       if [[ -r /dev/tty ]]; then
         read -r _ </dev/tty || true
       else
-        printf "\n" >&3
+        local outfd
+        outfd="$(console_outfd)"
+        printf "\n" >&"$outfd"
       fi
       date > "$stamp" 2>/dev/null || true
     else
@@ -275,19 +296,22 @@ step_termux_repo_select_once() {
   fi
 
   local did_run=0
+  local outfd errfd
+  outfd="$(console_outfd)"
+  errfd="$(console_errfd)"
 
   if [[ -r /dev/tty ]]; then
-    printf "\n${YEL}[iiab] One-time setup:${RST} Select a nearby Termux repository mirror for faster downloads.\n"
+    printf "\n${YEL}[iiab] One-time setup:${RST} Select a nearby Termux repository mirror for faster downloads.\n" >&"$outfd"
     local ans="Y"
-    printf "[iiab] Launch termux-change-repo now? [Y/n]: "
+    printf "[iiab] Launch termux-change-repo now? [Y/n]: " >&"$outfd"
     if ! IFS= read -r ans < /dev/tty; then
       warn "No interactive TTY available; skipping mirror selection (run 'termux-change-repo' directly to be prompted)."
       return 0
     fi
     ans="${ans:-Y}"
     if [[ "$ans" =~ ^[Yy]$ ]]; then
-      # Run interactive UI against /dev/tty and original console fds (3/4).
-      if termux-change-repo </dev/tty >&3 2>&4; then
+      # Run interactive UI against /dev/tty and the current console fds (works w/ or w/o logging).
+      if termux-change-repo </dev/tty >&"$outfd" 2>&"$errfd"; then
         did_run=1
       fi
       ok "Mirror selection completed (or skipped inside the UI)."
@@ -295,7 +319,7 @@ step_termux_repo_select_once() {
       warn "Mirror selection skipped by user."
     fi
     if (( did_run )); then
-      date > "$stamp"
+      date > "$stamp" 2>/dev/null || true
     else
       warn "Mirror not selected yet; you'll be asked again next run."
     fi
@@ -349,6 +373,7 @@ step_termux_base() {
     curl
     gawk
     grep
+    jq
     openssh
     proot
     proot-distro
@@ -383,7 +408,10 @@ step_termux_base() {
 # -------------------------
 step_termux_python_zeroconf() {
   baseline_need_python || return 0
-  [[ -f "$TERMUX_ZEROCONF_STAMP" ]] && return 0
+  if [[ -f "$TERMUX_ZEROCONF_STAMP" ]] && python_has_zeroconf; then
+    return 0
+  fi
+  [[ -f "$TERMUX_ZEROCONF_STAMP" ]] && rm -f "$TERMUX_ZEROCONF_STAMP" >/dev/null 2>&1 || true
 
   if ! have python; then
     warn "Android 11+: python is expected but missing; skipping zeroconf prep."
