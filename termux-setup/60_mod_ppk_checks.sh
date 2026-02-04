@@ -55,6 +55,35 @@ normalize_bool_tf01() {
     *)       echo "${1:-}" ;;
   esac
 }
+
+# Unified reader for Android "Disable child process restrictions"
+# Prints: true | false | unknown
+adb_get_monitor_phantom_procs() {
+  local serial="$1"
+  local v=""
+
+  # 1) settings global (preferred)
+  v="$(adb -s "$serial" shell settings get global settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' | tr -d '[:space:]' || true)"
+  v="$(normalize_bool_tf01 "$v")"
+  [[ "$v" == "true" || "$v" == "false" ]] && { echo "$v"; return 0; }
+
+  # 2) device_config fallbacks
+  v="$(adb -s "$serial" shell device_config get activity_manager settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' | tr -d '[:space:]' || true)"
+  v="$(normalize_bool_tf01 "$v")"
+  [[ "$v" == "true" || "$v" == "false" ]] && { echo "$v"; return 0; }
+
+  v="$(adb -s "$serial" shell device_config get activity_manager enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' | tr -d '[:space:]' || true)"
+  v="$(normalize_bool_tf01 "$v")"
+  [[ "$v" == "true" || "$v" == "false" ]] && { echo "$v"; return 0; }
+
+  # 3) legacy helper (last resort)
+  v="$(adb_get_child_restrictions_flag "$serial" 2>/dev/null | tr -d '\r' | tr -d '[:space:]' || true)"
+  v="$(normalize_bool_tf01 "$v")"
+  [[ "$v" == "true" || "$v" == "false" ]] && { echo "$v"; return 0; }
+
+  echo "unknown"
+}
+
 # -------------------------
 # Check readiness (best-effort)
 # -------------------------
@@ -85,13 +114,7 @@ check_readiness() {
   sdk="$(adb -s "$serial" shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
   rel="$(adb -s "$serial" shell getprop ro.build.version.release 2>/dev/null | tr -d '\r' || true)"
   dev_enabled="$(adb -s "$serial" shell settings get global development_settings_enabled 2>/dev/null | tr -d '\r' || true)"
-  mon_fflag="$(adb_get_child_restrictions_flag "$serial")"
-  if [[ "$mon_fflag" == "true" || "$mon_fflag" == "false" ]]; then
-    mon="$mon_fflag"
-  else
-    mon="$(adb -s "$serial" shell settings get global settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' || true)"
-  fi
-  mon="$(normalize_bool_tf01 "$mon")"
+  mon="$(adb_get_monitor_phantom_procs "$serial")"
 
   # Get effective value from dumpsys (device_config get may return 'null' even when an effective value exists)
   ds="$(adb -s "$serial" shell dumpsys activity settings 2>/dev/null | tr -d '\r' || true)"
@@ -165,14 +188,7 @@ self_check_android_flags() {
   log " Android flags (quick): release=${rel:-?} sdk=${sdk:-?} serial=$serial"
 
   if [[ "$sdk" =~ ^[0-9]+$ ]] && (( sdk >= 34 )); then
-    mon_fflag="$(adb_get_child_restrictions_flag "$serial")"
-    if [[ "$mon_fflag" == "true" || "$mon_fflag" == "false" ]]; then
-      mon="$mon_fflag"
-    else
-      mon="$(adb -s "$serial" shell settings get global settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' || true)"
-    fi
-  mon="$(normalize_bool_tf01 "$mon")"
-
+    mon="$(adb_get_monitor_phantom_procs "$serial")"
     if [[ "$mon" == "false" ]]; then
       ok " Child restrictions: OK (monitor=false)"
     elif [[ "$mon" == "true" ]]; then

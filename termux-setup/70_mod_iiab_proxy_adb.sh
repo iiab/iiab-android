@@ -370,19 +370,7 @@ proxy_android14_disable_phantom_monitor_or_fail() {
   fi
 
   # Read current state (prefer fflag helper, fallback to settings)
-  mon_fflag="$(adb_get_child_restrictions_flag "$serial" 2>/dev/null || true)"
-  if [[ "$mon_fflag" == "true" || "$mon_fflag" == "false" ]]; then
-    mon="$mon_fflag"
-  else
-    mon="$(adb -s "$serial" shell settings get global settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' || true)"
-  fi
-
-  # Normalize
-  case "$mon" in
-    0|false|"") mon="false" ;;
-    1|true)     mon="true" ;;
-    *)          mon="unknown" ;;
-  esac
+  mon="$(adb_get_monitor_phantom_procs "$serial")"
 
   if [[ "$mon" == "false" ]]; then
     ok "Android 14+: child process restrictions already disabled (monitor=false)."
@@ -402,18 +390,7 @@ proxy_android14_disable_phantom_monitor_or_fail() {
   adb -s "$serial" shell device_config put activity_manager enable_monitor_phantom_procs false >/dev/null 2>&1 || true
 
   # Re-read to verify
-  mon_fflag="$(adb_get_child_restrictions_flag "$serial" 2>/dev/null || true)"
-  if [[ "$mon_fflag" == "true" || "$mon_fflag" == "false" ]]; then
-    mon="$mon_fflag"
-  else
-    mon="$(adb -s "$serial" shell settings get global settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' || true)"
-  fi
-
-  case "$mon" in
-    0|false|"") mon="false" ;;
-    1|true)     mon="true" ;;
-    *)          mon="unknown" ;;
-  esac
+  mon="$(adb_get_monitor_phantom_procs "$serial")"
 
   if [[ "$mon" == "false" ]]; then
     ok "Android 14+: child process restrictions disabled successfully (monitor=false)."

@@ -277,12 +277,7 @@ final_advice() {
       else
         # If ADB is already connected, try to read the flag best-effort (no prompts).
         if [[ "$adb_connected" -eq 1 && -n "${serial:-}" ]]; then
-          mon_fflag="$(adb_get_child_restrictions_flag "$serial")"
-          if [[ "$mon_fflag" == "true" || "$mon_fflag" == "false" ]]; then
-            mon="$mon_fflag"
-          else
-            mon="$(adb -s "$serial" shell settings get global settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' || true)"
-          fi
+          mon="$(adb_get_monitor_phantom_procs "$serial")"
         fi
 
         if [[ "${mon:-}" == "false" ]]; then
