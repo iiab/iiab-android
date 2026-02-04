@@ -111,12 +111,16 @@ proxy_enter_session_if_requested() {
 
   # We require ADB for Android proxy toggling (but we can still start local services without it).
   if proxy_adb_alive; then
-    # Android 14+: hard gate (your PoC requirement)
+    # Android 12/13: hard gate
+    if ! proxy_android12_13_disable_phantom_monitor_or_fail; then
+      warn_red "Proxy: Android 12/13 PPK could not set to 256; refusing to enable proxy."
+      return 1
+    fi
+    # Android 14+: hard gate
     if ! proxy_android14_disable_phantom_monitor_or_fail; then
       warn_red "Proxy: Android 14+ phantom monitor could not be disabled/verified; refusing to enable proxy."
       return 1
     fi
-
       # Save current http_proxy (only once) if it's not ours.
       local cur=""
       cur="$(proxy_get_http_proxy 2>/dev/null || true)"
@@ -142,7 +146,7 @@ proxy_enter_session_if_requested() {
     warn "Tip: run iiab-termux --with-adb (or --adb-only / --connect-only) first."
   fi
 
-  # Start local services (best effort). If they fail, try to restore Android proxy.
+  # Start local services. If they fail, try to restore Android proxy.
   if ! proxy_start_services; then
     warn_red "Proxy: failed to start privoxy/haproxy or healthcheck failed."
     proxy_restore_android_http_proxy_best_effort || true
