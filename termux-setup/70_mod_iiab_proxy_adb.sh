@@ -102,66 +102,13 @@ proxy_ensure_pkgs() {
 proxy_install_configs_from_repo() {
    proxy_state_init
 
-  cat > "${HAPROXY_CFG}" <<'EOF'
-global
-    log stdout format raw local0
-    maxconn 256
-
-defaults
-    mode http
-    log global
-    option httplog
-    option dontlognull
-    timeout connect 5s
-    timeout client  60s
-    timeout server  60s
-
-frontend fe_boxlan
-    bind 127.0.0.1:8080
-    http-request set-uri %[req.uri,regsub(^https?://[^/]+,)] if { req.uri -m reg ^https?:// }
-    http-request set-header Host box.lan
-    http-request del-header Proxy-Connection
-    default_backend be_iiab
-
-backend be_iiab
-    server iiab 127.0.0.1:8085
-    http-response replace-header Location ^(https?://)box\.lan:8085(.*)$ \1box.lan\2
-    http-response replace-header Location ^(https?://)127\.0\.0\.1:8085(.*)$ \1box.lan\2
-EOF
-
-  cat > "${PRIVOXY_CFG}" <<'EOF'
-listen-address  127.0.0.1:9050
-
-toggle 1
-enable-remote-toggle 0
-enable-remote-http-toggle 0
-enable-edit-actions 0
-enforce-blocks 0
-debug 0
-
-confdir /data/data/com.termux/files/home/.iiab-android/proxy
-logdir  /data/data/com.termux/files/home/.iiab-android/logs
-
-actionsfile user.action
-EOF
-
-  cat > "${USER_ACTION}" <<'EOF'
-{+forward-override{forward 127.0.0.1:8080}}
-box.lan/
-EOF
-
-
-}
-
-# NOTE: For now, we generate configs here. Later we will copy from:
-waiting_on_commit() {
   have curl || { log "Installing curl (needed to fetch proxy configs)"; termux_apt update || true; termux_apt install curl || return 1; }
 
   # Expected raw URLs (enable once committed upstream)
-  # PROXY_RAW_BASE="https://raw.githubusercontent.com/iiab/iiab-android/refs/heads/main/termux-setup/proxy"
-  # HAPROXY_RAW_URL="${PROXY_RAW_BASE}/haproxy.cfg"
-  # PRIVOXY_RAW_URL="${PROXY_RAW_BASE}/privoxy.config"
-  # USER_ACTION_RAW_URL="${PROXY_RAW_BASE}/user.action"
+  PROXY_RAW_BASE="https://raw.githubusercontent.com/iiab/iiab-android/refs/heads/main/termux-setup/proxy/"
+  HAPROXY_RAW_URL="${PROXY_RAW_BASE}/haproxy.cfg"
+  PRIVOXY_RAW_URL="${PROXY_RAW_BASE}/privoxy.config"
+  USER_ACTION_RAW_URL="${PROXY_RAW_BASE}/user.action"
 
   # If URLs not configured yet, fail with a clear hint (so we don't silently continue).
   if [[ -z "${HAPROXY_RAW_URL:-}" || -z "${PRIVOXY_RAW_URL:-}" || -z "${USER_ACTION_RAW_URL:-}" ]]; then
@@ -254,8 +201,8 @@ proxy_stop_all() {
 proxy_start_all() {
   proxy_ensure_pkgs || { warn_red "Cannot install haproxy/privoxy"; return 1; }
   proxy_install_configs_from_repo || return 1
-  proxy_start_haproxy || return 1
   proxy_start_privoxy || return 1
+  proxy_start_haproxy || return 1
   return 0
 }
 
@@ -405,16 +352,127 @@ proxy_maybe_enable_feature() {
   return 0
 }
 
-# Placeholder: we can implement the real Android 14 phantom-process mitigation later.
+# Android 14+ (SDK >= 34):
+# Ensure "Disable child process restrictions" is effectively enabled (i.e., monitor phantom procs DISABLED).
+# Return 0 only if verified disabled (or not applicable). Return 1 if required but cannot enforce/verify.
 proxy_android14_disable_phantom_monitor_or_fail() {
   [[ "${PROXY_ADB:-0}" -eq 1 ]] || return 0
-  require_adb_connected >/dev/null 2>&1 || return 0
-  local sdk
-  sdk="$(adb shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
-  if [[ "$sdk" =~ ^[0-9]+$ ]] && (( sdk >= 34 )); then
-    warn "Android SDK $sdk detected (Android 14+). Phantom process monitor handling is not implemented yet; continuing."
+
+  require_adb_connected >/dev/null 2>&1 || return 1
+
+  local serial sdk mon mon_fflag
+  serial="$(adb_pick_loopback_serial 2>/dev/null || true)"
+  [[ -n "$serial" ]] || return 1
+
+  sdk="$(adb -s "$serial" shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
+  if [[ ! "$sdk" =~ ^[0-9]+$ ]] || (( sdk < 34 )); then
+    return 0
   fi
-  return 0
+
+  # Read current state (prefer fflag helper, fallback to settings)
+  mon_fflag="$(adb_get_child_restrictions_flag "$serial" 2>/dev/null || true)"
+  if [[ "$mon_fflag" == "true" || "$mon_fflag" == "false" ]]; then
+    mon="$mon_fflag"
+  else
+    mon="$(adb -s "$serial" shell settings get global settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' || true)"
+  fi
+
+  # Normalize
+  case "$mon" in
+    0|false|"") mon="false" ;;
+    1|true)     mon="true" ;;
+    *)          mon="unknown" ;;
+  esac
+
+  if [[ "$mon" == "false" ]]; then
+    ok "Android 14+: child process restrictions already disabled (monitor=false)."
+    return 0
+  fi
+
+  warn "Android 14+: enabling 'Disable child process restrictions' via ADB (monitor currently: $mon)."
+
+  # Try to disable via settings (common backing store)
+  # Some builds accept 0/1, others accept false/true. Try both.
+  adb -s "$serial" shell settings put global settings_enable_monitor_phantom_procs 0 >/dev/null 2>&1 || true
+  adb -s "$serial" shell settings put global settings_enable_monitor_phantom_procs false >/dev/null 2>&1 || true
+
+  # Optional: also try device_config flag if your helper relies on it (harmless if unsupported)
+  # Keep this best-effort, since device_config may require additional privileges on some ROMs.
+  adb -s "$serial" shell device_config put activity_manager settings_enable_monitor_phantom_procs false >/dev/null 2>&1 || true
+  adb -s "$serial" shell device_config put activity_manager enable_monitor_phantom_procs false >/dev/null 2>&1 || true
+
+  # Re-read to verify
+  mon_fflag="$(adb_get_child_restrictions_flag "$serial" 2>/dev/null || true)"
+  if [[ "$mon_fflag" == "true" || "$mon_fflag" == "false" ]]; then
+    mon="$mon_fflag"
+  else
+    mon="$(adb -s "$serial" shell settings get global settings_enable_monitor_phantom_procs 2>/dev/null | tr -d '\r' || true)"
+  fi
+
+  case "$mon" in
+    0|false|"") mon="false" ;;
+    1|true)     mon="true" ;;
+    *)          mon="unknown" ;;
+  esac
+
+  if [[ "$mon" == "false" ]]; then
+    ok "Android 14+: child process restrictions disabled successfully (monitor=false)."
+    return 0
+  fi
+
+  warn_red "Android 14+: could not disable/verify child process restrictions (monitor=$mon)."
+  warn "Open Developer Options and enable: 'Disable child process restrictions', then re-run."
+  return 1
+}
+
+proxy_android12_13_disable_phantom_monitor_or_fail() {
+  [[ "${PROXY_ADB:-0}" -eq 1 ]] || return 0
+  require_adb_connected >/dev/null 2>&1 || return 1
+
+  local serial sdk target cur ds
+  serial="$(adb_pick_loopback_serial 2>/dev/null || true)"
+  [[ -n "$serial" ]] || return 1
+
+  sdk="$(adb -s "$serial" shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
+  if [[ ! "$sdk" =~ ^[0-9]+$ ]] || (( sdk < 31 || sdk > 33 )); then
+    return 0
+  fi
+
+  # Default target is 256. Allow override.
+  target="${PROXY_PPK_TARGET:-256}"
+
+  # Helper: best-effort read effective value from dumpsys
+  _ppk_read_effective() {
+    ds="$(adb -s "$serial" shell dumpsys activity settings 2>/dev/null | tr -d '\r' || true)"
+    printf '%s\n' "$ds" \
+      | grep -m1 -E 'max_phantom_processes=' \
+      | sed -E 's/.*max_phantom_processes=([0-9]+).*/\1/' \
+      | tr -d '[:space:]' || true
+  }
+
+  cur="$(_ppk_read_effective)"
+  [[ "$cur" =~ ^[0-9]+$ ]] || cur="32"
+
+  if [[ "$cur" =~ ^[0-9]+$ ]] && (( cur >= target )); then
+    ok "Android 12/13: PPK already OK (max_phantom_processes=$cur, target=$target)."
+    return 0
+  fi
+
+  warn "Android 12/13: raising phantom process limit (current: $cur, target: $target)..."
+
+  # Apply via both paths
+  adb -s "$serial" shell settings put global max_phantom_processes "$target" >/dev/null 2>&1 || true
+  adb -s "$serial" shell device_config put activity_manager max_phantom_processes "$target" >/dev/null 2>&1 || true
+
+  # Verify again
+  cur="$(_ppk_read_effective)"
+  if [[ "$cur" =~ ^[0-9]+$ ]] && (( cur >= target )); then
+    ok "Android 12/13: PPK fixed successfully (max_phantom_processes=$cur)."
+    return 0
+  fi
+
+  warn_red "Android 12/13: failed to fix PPK (effective max_phantom_processes=${cur:-unknown}, target=$target)."
+  return 1
 }
 
 proxy_reconcile_on_startup() {
