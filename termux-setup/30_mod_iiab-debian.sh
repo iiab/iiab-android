@@ -80,7 +80,6 @@ step_iiab_bootstrap_default() {
               e2fsprogs \
               iputils-ping \
               netcat-traditional \
-              pkg-config \
               sudo
   '
   rc=$?

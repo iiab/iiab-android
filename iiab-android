@@ -173,7 +173,6 @@ apt-get install -y ca-certificates \
                    e2fsprogs \
                    iputils-ping \
                    netcat-traditional \
-                   pkg-config \
                    sudo
 
 # Install dependencies for ansible custom builds / ptyhon-cffi on 32bits
@@ -206,6 +205,16 @@ else
   log "Installing Android local_vars.yml template -> $LOCAL_VARS_DEST"
   fetch_android_local_vars "$LOCAL_VARS_DEST"
   validate_is_proot_or_die "$LOCAL_VARS_DEST" || { show_is_proot_lines "$LOCAL_VARS_DEST"; die "Android template local_vars.yml is invalid; cannot continue."; }
+fi
+
+#-----------------------------
+# Temporary workaround regarding kiwix on 32bits
+#-----------------------------
+if is_32bits; then
+  cat >> "$LOCAL_VARS_DEST" <<'EOF'
+kiwix_install: False
+kiwix_enabled: False
+EOF
 fi
 
 #-----------------------------
