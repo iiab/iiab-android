@@ -119,17 +119,22 @@ apt3_enable_sources() {
     return 1
   fi
 
-  apt modernize-sources -y
+  # Strict target: only <ID>.sources (Debian => debian.sources)
+  f="$apt_src_dir/$distro.sources"
 
-  # Prefer /etc/apt/sources.list.d/<ID>.sources, else fallback to first *.sources
-  if [ -f "$apt_src_dir/$distro.sources" ]; then
-    f="$apt_src_dir/$distro.sources"
-  else
-    f="$(ls -1 "$apt_src_dir"/*.sources 2>/dev/null | head -n 1 || true)"
+  # If not modernized yet, do it once
+  if [ ! -f "$f" ]; then
+    apt modernize-sources -y
   fi
-  if [ -z "$f" ] || [ ! -f "$f" ]; then
-    echo "ERROR: no .sources file found under $apt_src_dir" >&2
+
+  if [ ! -f "$f" ]; then
+    echo "ERROR: expected sources file not found: $f" >&2
     return 1
+  fi
+
+  # Idempotent: if deb-src already enabled, nothing to do
+  if grep -Eq '^[[:space:]]*Types:.*\bdeb-src\b' "$f"; then
+    return 0
   fi
 
   # Backup
@@ -196,10 +201,14 @@ apt-get install -y ca-certificates \
                    netcat-traditional \
                    sudo
 
-# Install dependencies for ansible custom builds / ptyhon-cffi on 32bits
+# Install dependencies for ansible custom builds on 32bits
 if is_32bits; then
+# python-cffi
   apt3_enable_sources
   apt-get build-dep -y python-cffi
+#calibre-web
+  apt-get install -y libxml2-dev \
+                     libxslt1-dev
 fi
 
 #-----------------------------
@@ -232,12 +241,7 @@ fi
 # Temporary workaround regarding roles on 32bits
 #-----------------------------
 # kiwix
-if is_32bits; then
-  cat >> "$LOCAL_VARS_DEST" <<'EOF'
-kiwix_install: False # 32bits; pending support.
-kiwix_enabled: False # 32bits; pending support.
-EOF
-fi
+disable_role_32bits kiwix "$LOCAL_VARS_DEST"
 # maps
 disable_role_32bits maps "$LOCAL_VARS_DEST"
 
