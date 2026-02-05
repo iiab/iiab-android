@@ -81,6 +81,68 @@ validate_is_proot_or_die() {
   die "local_vars.yml: conflicting is_proot entries. Keep only ONE: is_proot: True"
 }
 
+# -------------------------
+# Detect 32bits processor
+# -------------------------
+is_32bits() {
+  local bits
+  bits="$(getconf LONG_BIT 2>/dev/null || true)"
+  [ "$bits" = "32" ]
+}
+
+# -------------------------
+# Enable deb-src repositories for apt 3.0+ on Debian like OS.
+# -------------------------
+apt3_enable_sources() {
+  # Require apt >= 3.0
+  local apt_ver
+  apt_ver="$(apt -v 2>/dev/null | awk '{print $2}' | cut -d. -f1-2)"
+  if [ -z "$apt_ver" ]; then
+    echo "ERROR: couldn't detect apt version" >&2
+    return 1
+  fi
+  if ! dpkg --compare-versions "$apt_ver" ge "3.0"; then
+    echo "ERROR: apt >= 3.0 required (found $apt_ver)" >&2
+    return 1
+  fi
+
+  local apt_src_dir="/etc/apt/sources.list.d"
+  local distro="" f=""
+
+  # Load /etc/os-release
+  if [ -r /etc/os-release ]; then
+    . /etc/os-release
+    distro="${ID:-}"
+  fi
+  if [ -z "$distro" ]; then
+    echo "ERROR: couldn't determine ID from /etc/os-release" >&2
+    return 1
+  fi
+
+  apt modernize-sources -y
+
+  # Prefer /etc/apt/sources.list.d/<ID>.sources, else fallback to first *.sources
+  if [ -f "$apt_src_dir/$distro.sources" ]; then
+    f="$apt_src_dir/$distro.sources"
+  else
+    f="$(ls -1 "$apt_src_dir"/*.sources 2>/dev/null | head -n 1 || true)"
+  fi
+  if [ -z "$f" ] || [ ! -f "$f" ]; then
+    echo "ERROR: no .sources file found under $apt_src_dir" >&2
+    return 1
+  fi
+
+  # Backup
+  cp -a "$f" "$f.bak"
+
+  # Add deb-src to any Types: line that has deb but not deb-src
+  sed -i -E '/^[[:space:]]*Types:[[:space:]]*/{
+    /deb-src/! s/\bdeb\b/& deb-src/
+  }' "$f"
+
+  apt-get update
+}
+
 fetch_android_local_vars() {
   # args: destination
   local dest="$1"
@@ -111,7 +173,14 @@ apt-get install -y ca-certificates \
                    e2fsprogs \
                    iputils-ping \
                    netcat-traditional \
+                   pkg-config \
                    sudo
+
+# Install dependencies for ansible custom builds / ptyhon-cffi on 32bits
+if is_32bits; then
+  apt3_enable_sources
+  apt-get build-dep -y python-cffi
+fi
 
 #-----------------------------
 # Setup Android-specific local vars
