@@ -412,7 +412,7 @@ repo_selector__apply_group() {
 
 repo_selector_ask_configure() {
   local group="" tz="" label=""
-  
+
   # Only run if still on "All mirrors".
   if ! repo_selector__is_all_mirrors; then
     return 0
