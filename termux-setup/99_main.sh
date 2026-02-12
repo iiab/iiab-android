@@ -518,7 +518,7 @@ main() {
       exit 0
       ;;
     proxy-reset)
-      require_adb_connected || die "Se requiere ADB para resetear el proxy. Ejecuta: iiab-termux --adb-only"
+      require_adb_connected || die "ADB is required to reset the proxy. Run: iiab-termux --adb-only"
       proxy_disable
       exit 0
       ;;
@@ -536,7 +536,7 @@ main() {
       ;;
     baseline)
       power_mode_offer_battery_settings_once || true
-      step_termux_repo_select_once
+      repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
@@ -544,7 +544,7 @@ main() {
 
     with-adb)
       power_mode_offer_battery_settings_once || true
-      step_termux_repo_select_once
+      repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
@@ -579,7 +579,7 @@ main() {
 
     iiab-android)
       power_mode_offer_battery_settings_once || true
-      step_termux_repo_select_once
+      repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
@@ -592,7 +592,7 @@ main() {
 
     all)
       power_mode_offer_battery_settings_once || true
-      step_termux_repo_select_once
+      repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true

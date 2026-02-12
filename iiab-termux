@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# GENERATED FILE: 2026-02-11T14:38:19-06:00 - do not edit directly.
+# GENERATED FILE: 2026-02-12T12:51:23-06:00 - do not edit directly.
 # Source modules: termux-setup/*.sh + manifest.sh
 # Rebuild: (cd termux-setup && bash build_bundle.sh)
 # -----------------------------------------------------------------------------
@@ -15,6 +15,7 @@ set -euo pipefail
 RED="\033[31m"; YEL="\033[33m"; GRN="\033[32m"; BLU="\033[34m"; RST="\033[0m"; BOLD="\033[1m"
 
 log()      { printf "${BLU}[iiab]${RST} %s\n" "$*"; }
+log_yel()      { printf "${YEL}[iiab]${RST} %s\n" "$*"; }
 ok()       { printf "${GRN}[iiab]${RST} %s\n" "$*"; }
 warn()     { printf "${YEL}[iiab] WARNING:${RST} %s\n" "$*" >&2; }
 warn_red() { printf "${RED}${BOLD}[iiab] WARNING:${RST} %s\n" "$*" >&2; }
@@ -85,7 +86,8 @@ console_errfd() { fd4_available && echo 4 || echo 2; }
 tty_yesno_default_y() {
   # args: prompt
   # Returns 0 for Yes, 1 for No. Default is Yes.
-  local prompt="$1" ans="Y"
+  local prompt="$1" ans="Y" outfd
+  outfd="$(console_outfd)"
   if [[ -r /dev/tty ]]; then
     tty_prompt_print "$prompt"
     if ! read -r ans < /dev/tty; then
@@ -103,7 +105,8 @@ tty_yesno_default_y() {
 tty_yesno_default_n() {
   # args: prompt
   # Returns 0 for Yes, 1 for No. Default is No.
-  local prompt="$1" ans="N"
+  local prompt="$1" ans="N" outfd
+  outfd="$(console_outfd)"
   if [[ -r /dev/tty ]]; then
     tty_prompt_print "$prompt"
     read -r ans < /dev/tty || ans="N"
@@ -639,36 +642,156 @@ power_mode_offer_battery_settings_once() {
 # -------------------------
 # One-time repo selector
 # -------------------------
-step_termux_repo_select_once() {
-  local stamp="$STATE_DIR/stamp.termux_repo_selected"
-  [[ -f "$stamp" ]] && return 0
+repo_selector__mirror_base_dir() {
+  echo "${PREFIX}/etc/termux/mirrors"
+}
 
-  if ! have termux-change-repo; then
-    warn "termux-change-repo not found; skipping mirror selection."
+repo_selector__chosen_path() {
+  echo "${PREFIX}/etc/termux/chosen_mirrors"
+}
+
+repo_selector__is_all_mirrors() {
+  # Returns 0 if in "All mirrors" mode, 1 otherwise.
+  local chosen; chosen="$(repo_selector__chosen_path)"
+
+  # Missing -> treat as all mirrors.
+  [[ -e "$chosen" || -L "$chosen" || -d "$chosen" ]] || return 0
+
+  # Broken symlink -> pkg treats as all mirrors.
+  if [[ -L "$chosen" ]] && [[ ! -e "$chosen" ]]; then
     return 0
   fi
 
-  local outfd errfd
-  outfd="$(console_outfd)"
-  errfd="$(console_errfd)"
-
-  if [[ -r /dev/tty ]]; then
-    printf "\n${YEL}[iiab] One-time setup:${RST} Select a nearby Termux repository mirror for faster downloads.\n" >&"$outfd"
-
-    # Run interactive UI against /dev/tty and the current console fds (works w/ or w/o logging).
-    if termux-change-repo </dev/tty >&"$outfd" 2>&"$errfd"; then
-      ok "Mirror selection UI completed."
-    else
-      # Even if user exits/cancels, we still consider it "handled once" to avoid re-prompting.
-      warn "Mirror selection UI exited (canceled or failed). Not prompting again."
-    fi
-
-    date > "$stamp" 2>/dev/null || true
+  # If it resolves to mirrors/all, treat as all mirrors (in some installs it exists).
+  local base; base="$(repo_selector__mirror_base_dir)"
+  local resolved=""
+  resolved="$(readlink -f "$chosen" 2>/dev/null || true)"
+  if [[ -n "$resolved" && "$resolved" == "$base/all" ]]; then
     return 0
   fi
 
-  warn "No /dev/tty available; skipping mirror selection."
-  return 0
+  return 1
+}
+
+repo_selector__android_country_code() {
+  # Best-effort ISO-3166-1 alpha-2 (e.g. MX, US, CN, RU). Empty if unknown.
+  local v=""
+  for k in \
+    gsm.operator.iso-country \
+    gsm.sim.operator.iso-country \
+    persist.sys.country \
+    ro.product.locale.region \
+    ro.boot.wificountrycode \
+  ; do
+    v="$(getprop "$k" 2>/dev/null | tr -d '\r' | tr '[:lower:]' '[:upper:]')"
+    [[ -n "$v" ]] && { echo "$v"; return 0; }
+  done
+  return 1
+}
+
+repo_selector__android_timezone() {
+  getprop persist.sys.timezone 2>/dev/null | tr -d '\r'
+}
+
+repo_selector__detect_group() {
+  # Echo one of: asia|chinese_mainland|europe|north_america|oceania|russia
+  # or empty if unknown.
+  local cc=""; cc="$(repo_selector__android_country_code 2>/dev/null || true)"
+  case "$cc" in
+    CN) echo "chinese_mainland"; return 0 ;;
+    RU) echo "russia"; return 0 ;;
+  esac
+
+  local tz=""; tz="$(repo_selector__android_timezone)"
+  case "$tz" in
+    Asia/*)      echo "asia"; return 0 ;;
+    Europe/*)    echo "europe"; return 0 ;;
+    Africa/*)    echo "europe"; return 0 ;;   # closest available group
+    America/*)   echo "north_america"; return 0 ;;
+    Australia/*) echo "oceania"; return 0 ;;
+    Pacific/*)   echo "oceania"; return 0 ;;
+    *)           return 1 ;;
+  esac
+}
+
+repo_selector__label_for_group() {
+  # args: group_id [tz_hint]
+  local g="$1" tz="${2:-}"
+  case "$g" in
+    russia)           echo "Russia" ;;
+    chinese_mainland) echo "Chinese (Mainland)" ;;
+    asia)             echo "Asia" ;;
+    europe)
+      # If timezone suggests Africa, show that we chose Europe as closest.
+      if [[ "$tz" == Africa/* ]]; then
+        echo "Europe (Closest)"
+      else
+        echo "Europe"
+      fi
+      ;;
+    north_america)    echo "North America" ;;
+    oceania)          echo "Oceania" ;;
+    all)              echo "All mirrors" ;;
+    *)                echo "$g" ;;
+  esac
+}
+
+repo_selector__apply_group() {
+  local group="$1"
+  local base chosen target
+  base="$(repo_selector__mirror_base_dir)"
+  chosen="$(repo_selector__chosen_path)"
+  target="${base}/${group}"
+
+  if [[ ! -d "$target" ]]; then
+    warn "Repo group dir not found: $target"
+    return 1
+  fi
+
+  # Remove existing chosen_mirrors if it's a symlink (same behavior as termux-change-repo).
+  if [[ -L "$chosen" ]]; then
+    unlink "$chosen" 2>/dev/null || rm -f "$chosen" 2>/dev/null || true
+  elif [[ -e "$chosen" ]]; then
+    # Unexpected: file/dir created by user. Don't delete; just warn and stop.
+    warn "chosen_mirrors exists and is not a symlink: $chosen (leaving unchanged)"
+    return 1
+  fi
+
+  ln -s "$target" "$chosen"
+
+  # Force pkg to re-pick mirror from the new group and rewrite apt sources now.
+  # Same intent as termux-change-repo's final step.
+  ok "Repo group set: $group (chosen_mirrors -> $target)"
+  pkg --check-mirror update || true
+}
+
+repo_selector_ask_configure() {
+  local group="" tz="" label=""
+
+  # Only run if still on "All mirrors".
+  if ! repo_selector__is_all_mirrors; then
+    return 0
+  fi
+
+  log "Configuring Termux repository location..."
+  tz="$(repo_selector__android_timezone)"
+  group="$(repo_selector__detect_group 2>/dev/null || true)"
+  label="$(repo_selector__label_for_group "$group" "$tz")"
+
+  if [[ -z "$group" ]]; then
+    warn "Unable to detect region reliably."
+    warn "Tip: run 'termux-change-repo' to select a nearby mirror group manually."
+    return 0
+  fi
+
+  log "Detected repo group: $label"
+  if tty_yesno_default_y "[iiab] Apply this mirror group now? [Y/n]: "; then
+    repo_selector__apply_group "$group" || true
+    ok "Region repo set, continuing with the installation."
+  else
+    log_yel "You are encouraged to manually select a nearby repo using: termux-change-repo"
+    log_yel "Leaving at 'All mirrors' until set manually."
+  fi
 }
 
 # -------------------------
@@ -2968,7 +3091,7 @@ main() {
       exit 0
       ;;
     proxy-reset)
-      require_adb_connected || die "Se requiere ADB para resetear el proxy. Ejecuta: iiab-termux --adb-only"
+      require_adb_connected || die "ADB is required to reset the proxy. Run: iiab-termux --adb-only"
       proxy_disable
       exit 0
       ;;
@@ -2986,7 +3109,7 @@ main() {
       ;;
     baseline)
       power_mode_offer_battery_settings_once || true
-      step_termux_repo_select_once
+      repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
@@ -2994,7 +3117,7 @@ main() {
 
     with-adb)
       power_mode_offer_battery_settings_once || true
-      step_termux_repo_select_once
+      repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
@@ -3029,7 +3152,7 @@ main() {
 
     iiab-android)
       power_mode_offer_battery_settings_once || true
-      step_termux_repo_select_once
+      repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
@@ -3042,7 +3165,7 @@ main() {
 
     all)
       power_mode_offer_battery_settings_once || true
-      step_termux_repo_select_once
+      repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true

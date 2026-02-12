@@ -4,6 +4,7 @@
 RED="\033[31m"; YEL="\033[33m"; GRN="\033[32m"; BLU="\033[34m"; RST="\033[0m"; BOLD="\033[1m"
 
 log()      { printf "${BLU}[iiab]${RST} %s\n" "$*"; }
+log_yel()      { printf "${YEL}[iiab]${RST} %s\n" "$*"; }
 ok()       { printf "${GRN}[iiab]${RST} %s\n" "$*"; }
 warn()     { printf "${YEL}[iiab] WARNING:${RST} %s\n" "$*" >&2; }
 warn_red() { printf "${RED}${BOLD}[iiab] WARNING:${RST} %s\n" "$*" >&2; }
@@ -74,7 +75,8 @@ console_errfd() { fd4_available && echo 4 || echo 2; }
 tty_yesno_default_y() {
   # args: prompt
   # Returns 0 for Yes, 1 for No. Default is Yes.
-  local prompt="$1" ans="Y"
+  local prompt="$1" ans="Y" outfd
+  outfd="$(console_outfd)"
   if [[ -r /dev/tty ]]; then
     tty_prompt_print "$prompt"
     if ! read -r ans < /dev/tty; then
@@ -92,7 +94,8 @@ tty_yesno_default_y() {
 tty_yesno_default_n() {
   # args: prompt
   # Returns 0 for Yes, 1 for No. Default is No.
-  local prompt="$1" ans="N"
+  local prompt="$1" ans="N" outfd
+  outfd="$(console_outfd)"
   if [[ -r /dev/tty ]]; then
     tty_prompt_print "$prompt"
     read -r ans < /dev/tty || ans="N"
