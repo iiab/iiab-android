@@ -242,6 +242,44 @@ proxy_start_all() {
 }
 
 # -------------
+# Session lock (detect ongoing proxy session in Termux shell)
+# -------------
+proxy_session_file() { echo "${PROXY_STATE}/session.pid"; }
+
+# Write current iiab-termux PID as "active proxy session"
+proxy_session_mark_active() {
+  proxy_state_init
+  printf '%s\n' "$$" >"$(proxy_session_file)" 2>/dev/null || true
+}
+
+# Echo active PID only if still alive
+proxy_session_active_pid() {
+  local pid=""
+  [[ -r "$(proxy_session_file)" ]] || return 1
+  pid="$(cat "$(proxy_session_file)" 2>/dev/null || true)"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" >/dev/null 2>&1 || return 1
+  printf '%s\n' "$pid"
+}
+
+proxy_session_is_active() { proxy_session_active_pid >/dev/null 2>&1; }
+proxy_session_is_mine() {
+  local pid=""
+  [[ -r "$(proxy_session_file)" ]] || return 1
+  pid="$(cat "$(proxy_session_file)" 2>/dev/null || true)"
+  [[ "$pid" == "$$" ]]
+}
+
+proxy_session_clear_if_mine() {
+  proxy_session_is_mine || return 0
+  rm -f "$(proxy_session_file)" >/dev/null 2>&1 || true
+}
+
+proxy_session_clear_any() {
+  rm -f "$(proxy_session_file)" >/dev/null 2>&1 || true
+}
+
+# -------------
 # Enable/Disable (ADB global http_proxy)
 # -------------
 proxy_enable() {
@@ -318,6 +356,7 @@ proxy_disable() {
   proxy_disable_flag_off
   proxy_stop_all
   proxy_clear_prev_proxy
+  proxy_session_clear_any
   ok "Proxy disabled."
 }
 
@@ -327,6 +366,7 @@ proxy_status() {
   cur="$(proxy_get_http_proxy 2>/dev/null || true)"
 
   echo "[proxy] enabled_flag=$(proxy_is_enabled && echo yes || echo no)"
+  echo "[proxy] session_active=$(proxy_session_is_active && echo yes || echo no)"
   echo "[proxy] android_http_proxy=${cur:-<empty>}"
   echo "[proxy] haproxy_running=$(proxy_is_pid_running "$(proxy_pidfile_haproxy)" && echo yes || echo no)"
   echo "[proxy] privoxy_running=$(proxy_is_pid_running "$(proxy_pidfile_privoxy)" && echo yes || echo no)"
@@ -355,6 +395,9 @@ proxy_cleanup_on_exit() {
 
   proxy_feature_enabled || return 0
   proxy_state_init
+
+  # If we're the session owner, clear our lock on normal exit paths.
+  proxy_session_clear_if_mine >/dev/null 2>&1 || true
 
   # If we changed Android http_proxy and ADB is alive, restore it first.
   if [[ -f "${PROXY_STATE}/restore_needed" ]] && proxy_adb_alive; then
@@ -496,7 +539,14 @@ proxy_reconcile_on_startup() {
     return 0
   fi
 
-  warn_red "Proxy recovery: it looks like the previous proxy session did not exit cleanly (restore_needed)."
+  local active_pid=""
+  active_pid="$(proxy_session_active_pid 2>/dev/null || true)"
+  if [[ -n "$active_pid" ]]; then
+    log_yel "Proxy notice: an active proxy session seems to be running in another Termux shell (pid=${active_pid})."
+    log_yel "If that's the case, you can ignore 'recovery' messaging from this shell."
+  else
+    warn_red "Proxy recovery: it looks like the previous proxy session did not exit cleanly (restore_needed)."
+  fi
 
   local hap_ok=0 pri_ok=0
   proxy_is_pid_running "$(proxy_pidfile_haproxy)" && hap_ok=1
