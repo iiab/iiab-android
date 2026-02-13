@@ -116,7 +116,21 @@ proxy_enter_session_if_requested() {
     return 0
   fi
 
-  # We require ADB for Android proxy toggling (but we can still start local services without it).
+  # PROXY mode => ADB must be connected. If not, force the wizard (equivalent to --adb-only).
+  if ! require_adb_connected >/dev/null 2>&1; then
+    log_yel "Proxy: PROXY mode requested; ADB is not connected. Starting Wireless ADB wizard..."
+    if sdk_le 29; then
+      warn "Android 8-10: Wireless ADB pairing/connect is not available; cannot enforce proxy via ADB."
+      return 1
+    fi
+    adb_pair_connect_if_needed || true
+    if ! require_adb_connected >/dev/null 2>&1; then
+      warn "Proxy: ADB still not connected after wizard; continuing WITHOUT proxy."
+      return 1
+    fi
+  fi
+
+  # ADB is connected here.
   if proxy_adb_alive; then
     # Android 12/13: hard gate
     if ! proxy_android12_13_disable_phantom_monitor_or_fail; then
@@ -128,18 +142,18 @@ proxy_enter_session_if_requested() {
       warn_red "Proxy: Android 14+ phantom monitor could not be disabled/verified; refusing to enable proxy."
       return 1
     fi
-      # Save current http_proxy (only once) if it's not ours.
+      # Save current http_proxy for restoration on exit.
       local cur=""
       cur="$(proxy_get_http_proxy 2>/dev/null || true)"
       cur="${cur:-:0}"
-    if proxy_is_ours_value "$cur"; then
-      log "Proxy: Android http_proxy already set to our value (${PRIVOXY_LISTEN})."
-    else
-        if proxy_is_none_value "$cur"; then
+      if proxy_is_ours_value "$cur"; then
+        # If we're already on our proxy but no restore flag exists, assume stale state and plan to clear on exit.
+        if [[ ! -f "$(proxy_restore_flag)" ]]; then
           proxy_write_prev_proxy ":0"
-        else
-          proxy_write_prev_proxy "$cur"
         fi
+        log "Proxy: Android http_proxy already points to our proxy (${PRIVOXY_LISTEN})."
+      else
+        if proxy_is_none_value "$cur"; then proxy_write_prev_proxy ":0"; else proxy_write_prev_proxy "$cur"; fi
         if proxy_set_http_proxy "${PRIVOXY_LISTEN}"; then
           ok "Proxy: set Android http_proxy -> ${PRIVOXY_LISTEN}"
         else
@@ -147,13 +161,10 @@ proxy_enter_session_if_requested() {
           proxy_clear_prev_proxy
           return 1
         fi
-    fi
-  else
-    warn "Proxy: ADB not connected; will not toggle Android http_proxy."
-    warn "Tip: run iiab-termux --with-adb (or --adb-only / --connect-only) first."
+      fi
   fi
 
-  # Start local services. If they fail, try to restore Android proxy.
+  # Start local services. If they fail, restore Android proxy.
   if ! proxy_start_services; then
     warn_red "Proxy: failed to start privoxy/haproxy or healthcheck failed."
     proxy_restore_android_http_proxy_best_effort || true
@@ -162,20 +173,46 @@ proxy_enter_session_if_requested() {
   fi
 
   ok "Proxy: services started and ready (Privoxy ${PRIVOXY_LISTEN} -> HAProxy ${HAPROXY_LISTEN})."
+  PROXY_SESSION_ACTIVE=1
+  proxy_enable_flag_on
+  proxy_session_mark_active
   return 0
 }
 
 proxy_exit_session_if_requested() {
   proxy_feature_enabled || return 0
+  proxy_state_init
 
-  if proxy_adb_alive; then
-    proxy_restore_android_http_proxy_best_effort || true
-    proxy_stop_services_best_effort || true
+  # Only do "forced ADB restore" if we actually entered a proxy session
+  # (strong evidence: restore_needed OR in-memory flag).
+  if [[ "${PROXY_SESSION_ACTIVE:-0}" -ne 1 && ! -f "$(proxy_restore_flag)" ]]; then
     return 0
   fi
 
-  warn_red "Proxy: exiting without ADB. Keeping privoxy/haproxy running to avoid cutting Internet."
-  warn "As soon as ADB is available, run: iiab-termux --proxy-reset"
+  if ! require_adb_connected >/dev/null 2>&1; then
+    log_yel "Proxy: this session started in PROXY mode; closing it requires restoring Android http_proxy."
+    log_yel "Starting Wireless ADB wizard now..."
+    adb_pair_connect_if_needed || true
+
+    if ! require_adb_connected >/dev/null 2>&1; then
+      if tty_yesno_default_y "[iiab] ADB still not connected. Retry wizard once more? [Y/n]: "; then
+        adb_pair_connect_if_needed || true
+      fi
+    fi
+  fi
+
+  if ! require_adb_connected >/dev/null 2>&1; then
+    warn_red "Proxy: cannot restore Android http_proxy without ADB."
+    warn "Keeping privoxy/haproxy running to avoid cutting Internet."
+    warn "As soon as ADB is available, run: iiab-termux --proxy-reset"
+    return 0
+  fi
+
+  proxy_restore_android_http_proxy_best_effort || true
+  proxy_stop_services_best_effort || true
+  proxy_disable_flag_off || true
+  proxy_session_clear_if_mine || true
+  PROXY_SESSION_ACTIVE=0
   return 0
 }
 
@@ -222,6 +259,9 @@ baseline_bail() {
 }
 
 final_advice() {
+  case "${MODE:-}" in
+    login|proxy-status|proxy-reset) return 0 ;;
+  esac
   if [[ "${BASELINE_OK:-0}" -ne 1 ]]; then
     warn_red "Baseline is not ready, so ADB prompts / IIAB Debian bootstrap may be unavailable."
     [[ -n "${BASELINE_ERR:-}" ]] && warn "Reason: ${BASELINE_ERR}"
@@ -518,7 +558,18 @@ main() {
       exit 0
       ;;
     proxy-reset)
-      require_adb_connected || die "ADB is required to reset the proxy. Run: iiab-termux --adb-only"
+      # If ADB isn't connected, force the wizard (same intent as --adb-only).
+      if ! require_adb_connected >/dev/null 2>&1; then
+        log_yel "Proxy reset: ADB is not connected. Starting Wireless ADB wizard..."
+        if sdk_le 29; then
+          die "Android 8-10: Wireless debugging pairing is not available; cannot reset proxy via ADB."
+        fi
+        adb_pair_connect_if_needed || true
+      fi
+
+      # Still no ADB -> we cannot safely restore Android http_proxy. Keep restore_needed.
+      require_adb_connected || die "Proxy reset: still no ADB. Cannot restore Android http_proxy. Try again, then run: iiab-termux --proxy-reset"
+
       proxy_disable
       exit 0
       ;;
