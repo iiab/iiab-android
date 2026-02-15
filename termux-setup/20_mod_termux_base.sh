@@ -429,7 +429,8 @@ repo_selector_ask_configure() {
     return 0
   fi
 
-  log "Detected repo group: $label"
+  log "Detected repo group: "
+  printf "> ${BOLD}${BLU}$label${RST}\n"
   if tty_yesno_default_y "[iiab] Apply this mirror group now? [Y/n]: "; then
     repo_selector__apply_group "$group" || true
     ok "Region repo set, continuing with the installation."
