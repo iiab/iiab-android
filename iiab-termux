@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# GENERATED FILE: 2026-02-14T18:42:44-06:00 - do not edit directly.
+# GENERATED FILE: 2026-02-14T20:53:14-06:00 - do not edit directly.
 # Source modules: termux-setup/*.sh + manifest.sh
 # Rebuild: (cd termux-setup && bash build_bundle.sh)
 # -----------------------------------------------------------------------------
@@ -784,7 +784,8 @@ repo_selector_ask_configure() {
     return 0
   fi
 
-  log "Detected repo group: $label"
+  log "Detected repo group: "
+  printf "> ${BOLD}${BLU}$label${RST}\n"
   if tty_yesno_default_y "[iiab] Apply this mirror group now? [Y/n]: "; then
     repo_selector__apply_group "$group" || true
     ok "Region repo set, continuing with the installation."
@@ -1108,7 +1109,7 @@ notify_ask_one() {
   # args: key title content
   local key="$1" title="$2" content="$3"
   local out="$ADB_STATE_DIR/$key.reply"
-  rm -f "$out"
+  rm -f "$out" >/dev/null 2>&1 || true
 
   # Fresh notification each time + sound (use a new ID so Android plays sound each time)
   local nid
@@ -1123,7 +1124,9 @@ notify_ask_one() {
   # Direct reply: Termux:API injects the user input into $REPLY for the action.
   # Write it to a known file, then the main loop reads it.
   local action
-  action="sh -lc 'umask 077; printf \"%s\" \"\$REPLY\" > \"${out}\"'"
+  # Avoid brittle nested quoting by passing OUT via environment.
+  # shellcheck disable=SC2016
+  action="env OUT=\"$out\" sh -lc 'umask 077; printf %s \"\$REPLY\" > \"\$OUT\"'"
 
   termux-notification \
     --id "$nid" \
