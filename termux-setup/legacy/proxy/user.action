@@ -1,0 +1,5 @@
+# Only box.lan goes through HAProxy (local clean reverse proxy)
+{+forward-override{forward 127.0.0.1:8080}}
+box/
+box.local/
+box.lan/
