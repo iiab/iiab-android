@@ -46,7 +46,7 @@ notify_ask_one() {
   # args: key title content
   local key="$1" title="$2" content="$3"
   local out="$ADB_STATE_DIR/$key.reply"
-  rm -f "$out"
+  rm -f "$out" >/dev/null 2>&1 || true
 
   # Fresh notification each time + sound (use a new ID so Android plays sound each time)
   local nid
@@ -61,7 +61,9 @@ notify_ask_one() {
   # Direct reply: Termux:API injects the user input into $REPLY for the action.
   # Write it to a known file, then the main loop reads it.
   local action
-  action="sh -lc 'umask 077; printf \"%s\" \"\$REPLY\" > \"${out}\"'"
+  # Avoid brittle nested quoting by passing OUT via environment.
+  # shellcheck disable=SC2016
+  action="env OUT=\"$out\" sh -lc 'umask 077; printf %s \"\$REPLY\" > \"\$OUT\"'"
 
   termux-notification \
     --id "$nid" \
