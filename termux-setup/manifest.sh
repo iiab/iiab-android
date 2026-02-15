@@ -10,6 +10,6 @@ MODULES=(
   "45_mod_power_mode.sh"
   "50_mod_adb.sh"
   "60_mod_ppk_checks.sh"
-  "70_mod_iiab_proxy_adb.sh"
+  "70_mod_boxyproxy.sh"
   "99_main.sh"
 )

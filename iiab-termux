@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# GENERATED FILE: 2026-02-13T01:59:18-06:00 - do not edit directly.
+# GENERATED FILE: 2026-02-14T18:42:44-06:00 - do not edit directly.
 # Source modules: termux-setup/*.sh + manifest.sh
 # Rebuild: (cd termux-setup && bash build_bundle.sh)
 # -----------------------------------------------------------------------------
@@ -784,8 +784,7 @@ repo_selector_ask_configure() {
     return 0
   fi
 
-  log "Detected repo group: "
-  printf "> ${BOLD}${BLU}$label${RST}\n"
+  log "Detected repo group: $label"
   if tty_yesno_default_y "[iiab] Apply this mirror group now? [Y/n]: "; then
     repo_selector__apply_group "$group" || true
     ok "Region repo set, continuing with the installation."
@@ -1827,6 +1826,8 @@ ppk_fix_via_adb() {
 # Some Android versions may ignore/rename this; we don't hard-fail.
 adb -s "$serial" shell sh -s -- "$max" <<'EOF' || true
     set -e
+    max="${1:-256}"
+
     # Prefer device_config binary; fallback to "cmd device_config" on some ROMs.
     if command -v device_config >/dev/null 2>&1; then
       dc() { device_config "$@"; }
@@ -1908,7 +1909,7 @@ adb_get_monitor_phantom_procs() {
   done
 
   # 2) device_config fallbacks
-  if adb -s "$serial" shell command -v device_config >/dev/null 2>&1; then
+  if adb -s "$serial" shell 'command -v device_config >/dev/null 2>&1 || command -v cmd >/dev/null 2>&1'; then
     for k in "${keys[@]}"; do
       v="$(adb_device_config_get_key "$serial" activity_manager "$k")"
       v="$(normalize_bool_tf01 "$v")"
@@ -2114,608 +2115,104 @@ self_check_android_flags() {
 # ---- END 60_mod_ppk_checks.sh ----
 
 
-# ---- BEGIN 70_mod_iiab_proxy_adb.sh ----
+# ---- BEGIN 70_mod_boxyproxy.sh ----
 # shellcheck shell=bash
 # Module file (no shebang). Bundled by build_bundle.sh
 
 # -----------------------------------------------------------------------------
-# IIAB Proxy (haproxy + privoxy) controlled by ADB global http_proxy
-# - Configs come from repo folder: termux-setup/proxy/{haproxy.cfg,privoxy.config,user.action}
-# - Runtime folder: ~/.iiab-android/proxy/
-# - privoxy listens on 127.0.0.1:9050
-# - haproxy listens on 127.0.0.1:8080 and forwards to IIAB origin (127.0.0.1:8085)
+# boxyproxy.py companion management
+# - Installs/updates to: $PREFIX/bin/boxyproxy.py
+# - Runtime state: ~/.iiab-android/boxyproxy/
 # -----------------------------------------------------------------------------
 
-# Runtime dirs/state
-PROXY_DIR="${HOME}/.iiab-android/proxy"
-PROXY_STATE="${PROXY_DIR}/state"
-PROXY_STAMP_PROVISIONED="${PROXY_STATE}/stamp.provisioned"
-PROXY_PIDDIR="${PROXY_STATE}/pids"
+BOXYPROXY_BIN="${PREFIX}/bin/boxyproxy.py"
+BOXYPROXY_PIDFILE="${STATE_DIR}/boxyproxy.pid"
+BOXYPROXY_LOG="${LOG_DIR}/boxyproxy.log"
 
-# Runtime config destinations
-HAPROXY_CFG="${PROXY_DIR}/haproxy.cfg"
-PRIVOXY_CFG="${PROXY_DIR}/privoxy.config"
-USER_ACTION="${PROXY_DIR}/user.action"
+# DNF: Confirm final URL
+BOXYPROXY_RAW_URL_DEFAULT="https://raw.githubusercontent.com/iiab/iiab-android/main/termux-setup/proxy/boxyproxy.py"
+BOXYPROXY_RAW_URL="${BOXYPROXY_RAW_URL:-$BOXYPROXY_RAW_URL_DEFAULT}"
 
-# Fixed endpoints
-PRIVOXY_LISTEN="127.0.0.1:9050"
-HAPROXY_LISTEN="127.0.0.1:8080"
+boxyproxy_is_installed() { [[ -x "$BOXYPROXY_BIN" ]]; }
 
-# IIAB origin for quick curl checks (inside Termux, IIAB web is usually on 127.0.0.1:8085)
-IIAB_ORIGIN="http://127.0.0.1:8085/"
-IIAB_PROXY_URL="http://${PRIVOXY_LISTEN}"
-
-# -------------
-# State helpers
-# -------------
-proxy_state_init() {
-  mkdir -p "${PROXY_DIR}" "${PROXY_STATE}" "${PROXY_PIDDIR}" "${LOG_DIR:-${HOME}/.iiab-android/logs}" >/dev/null 2>&1 || true
+boxyproxy_state_init() {
+  mkdir -p "$STATE_DIR" "$LOG_DIR" >/dev/null 2>&1 || true
 }
 
-proxy_is_enabled() { [[ -f "${PROXY_STATE}/enabled" ]]; }
-proxy_enable_flag_on() { proxy_state_init; : > "${PROXY_STATE}/enabled"; }
-proxy_disable_flag_off() { rm -f "${PROXY_STATE}/enabled" >/dev/null 2>&1 || true; }
-
-proxy_prev_file() { echo "${PROXY_STATE}/prev_http_proxy"; }
-proxy_restore_flag() { echo "${PROXY_STATE}/restore_needed"; }
-
-proxy_write_prev_proxy() {
-  local prev="$1"
-  printf '%s\n' "${prev}" > "$(proxy_prev_file)"
-  : > "$(proxy_restore_flag)"
+boxyproxy_is_running() {
+  boxyproxy_is_installed || return 1
+  "$BOXYPROXY_BIN" --status --pidfile "$BOXYPROXY_PIDFILE" 2>/dev/null | grep -q "running"
 }
 
-proxy_is_provisioned() { [[ -f "${PROXY_STAMP_PROVISIONED}" ]]; }
-proxy_mark_provisioned() {
-  proxy_state_init
-  date > "${PROXY_STAMP_PROVISIONED}" 2>/dev/null || : > "${PROXY_STAMP_PROVISIONED}"
-}
+boxyproxy_install_or_update() {
+  boxyproxy_state_init
+  have curl || { log "Installing curl (needed to fetch boxyproxy.py)"; termux_apt update || true; termux_apt install curl || return 1; }
 
-proxy_clear_prev_proxy() {
-  rm -f "$(proxy_prev_file)" "$(proxy_restore_flag)" >/dev/null 2>&1 || true
-}
-
-# -------------
-# ADB helpers
-# -------------
-proxy_adb_alive() { adb get-state >/dev/null 2>&1; }
-
-proxy_adb_serial_quiet() {
-  adb start-server >/dev/null 2>&1 || true
-  adb_pick_loopback_serial 2>/dev/null || return 1
-}
-
-proxy_get_http_proxy() {
-  local s
-  s="$(proxy_adb_serial_quiet)" || return 1
-  adb -s "$s" shell settings get global http_proxy 2>/dev/null | tr -d '\r' || true
-}
-
-proxy_set_http_proxy() {
-  # $1 = value, e.g. "127.0.0.1:9050" or ":0"
-  local s
-  s="$(proxy_adb_serial_quiet)" || return 1
-  adb -s "$s" shell settings put global http_proxy "$1" >/dev/null 2>&1 || return 1
-}
-
-proxy_is_ours_value() {
-  local cur="$1"
-  [[ "${cur}" == "${PRIVOXY_LISTEN}" ]]
-}
-
-proxy_is_none_value() {
-  local cur="$1"
-  [[ -z "${cur}" || "${cur}" == "null" || "${cur}" == ":0" ]]
-}
-
-# -------------
-# Package install
-# -------------
-proxy_ensure_pkgs() {
-  # Install on-demand (do not bloat baseline if user never uses proxy)
-  have haproxy && have privoxy && return 0
-  log "Installing proxy packages in Termux: haproxy + privoxy ..."
-  termux_apt update || true
-  termux_apt install haproxy privoxy || return 1
-  have haproxy && have privoxy
-}
-
-# -------------
-# Config deploy (PoC: heredoc; later download from URL)
-# -------------
-proxy_install_configs_from_repo() {
-   proxy_state_init
-
-  have curl || { log "Installing curl (needed to fetch proxy configs)"; termux_apt update || true; termux_apt install curl || return 1; }
-
-  # Expected raw URLs (enable once committed upstream)
-  PROXY_RAW_BASE="https://raw.githubusercontent.com/iiab/iiab-android/refs/heads/main/termux-setup/proxy/"
-  HAPROXY_RAW_URL="${PROXY_RAW_BASE}/haproxy.cfg"
-  PRIVOXY_RAW_URL="${PROXY_RAW_BASE}/privoxy.config"
-  USER_ACTION_RAW_URL="${PROXY_RAW_BASE}/user.action"
-
-  # If URLs not configured yet, fail with a clear hint (so we don't silently continue).
-  if [[ -z "${HAPROXY_RAW_URL:-}" || -z "${PRIVOXY_RAW_URL:-}" || -z "${USER_ACTION_RAW_URL:-}" ]]; then
-    warn_red "Proxy raw URLs are not configured yet (HAPROXY/PRIVOXY/USER_ACTION)."
+  mkdir -p "${PREFIX}/bin" >/dev/null 2>&1 || true
+  local tmp="${BOXYPROXY_BIN}.tmp.$$"
+  log "Updating boxyproxy.py -> ${BOXYPROXY_BIN}"
+  if ! curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 8 --max-time 45 \
+      "$BOXYPROXY_RAW_URL" -o "$tmp"; then
+    warn_red "Failed downloading boxyproxy.py from: $BOXYPROXY_RAW_URL"
+    rm -f "$tmp" >/dev/null 2>&1 || true
     return 1
   fi
 
-  log "Downloading proxy configs (raw) into: ${PROXY_DIR}"
-  if ! curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 8 --max-time 30 "$HAPROXY_RAW_URL" -o "${HAPROXY_CFG}"; then
-    warn_red "Failed downloading haproxy.cfg from: $HAPROXY_RAW_URL"; return 1
-  fi
-  if ! curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 8 --max-time 30 "$PRIVOXY_RAW_URL" -o "${PRIVOXY_CFG}"; then
-    warn_red "Failed downloading privoxy.config from: $PRIVOXY_RAW_URL"; return 1
-  fi
-  if ! curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 8 --max-time 30 "$USER_ACTION_RAW_URL" -o "${USER_ACTION}"; then
-    warn_red "Failed downloading user.action from: $USER_ACTION_RAW_URL"; return 1
+  # Minimal sanity check: must look like a python script.
+  if ! head -n1 "$tmp" 2>/dev/null | grep -qE '^#!.*python'; then
+    warn_red "Downloaded file does not look like a python script (missing shebang)."
+    rm -f "$tmp" >/dev/null 2>&1 || true
+    return 1
   fi
 
-  chmod 600 "${HAPROXY_CFG}" "${PRIVOXY_CFG}" "${USER_ACTION}" >/dev/null 2>&1 || true
-  ok "Proxy configs installed (raw) to: ${PROXY_DIR}"
+  chmod 700 "$tmp" >/dev/null 2>&1 || true
+  mv -f "$tmp" "$BOXYPROXY_BIN" || return 1
+  chmod 700 "$BOXYPROXY_BIN" >/dev/null 2>&1 || true
+  ok "boxyproxy.py installed/updated: $BOXYPROXY_BIN"
   return 0
 }
 
-# Download configs, do not overwrite user edits on login
-proxy_install_configs_once_from_repo() {
-  proxy_state_init
-  if proxy_is_provisioned; then
-    log "Proxy configs already provisioned (stamp exists). Not downloading."
-    return 0
-  fi
-  proxy_install_configs_from_repo || return 1
-  proxy_mark_provisioned
-  ok "Proxy provisioned: configs installed; stamp created."
-  return 0
-}
+boxyproxy_start() {
+  boxyproxy_state_init
+  boxyproxy_is_running && { ok "boxyproxy already running."; return 0; }
 
-# Provision = packages + configs (called by --proxy-iiab).
-proxy_provision() {
-  proxy_state_init
-  proxy_ensure_pkgs || { warn_red "Cannot install haproxy/privoxy"; return 1; }
-  proxy_install_configs_once_from_repo || return 1
-  return 0
-}
-
-# Ensure local configs exist before starting services (no network calls).
-proxy_require_local_configs() {
-  [[ -s "${HAPROXY_CFG}" && -s "${PRIVOXY_CFG}" && -s "${USER_ACTION}" ]] && return 0
-  warn_red "Proxy configs are missing in: ${PROXY_DIR}"
-  warn "Run: iiab-termux --proxy-iiab"
-  return 1
-}
-
-# -------------
-# Process management
-# -------------
-proxy_pidfile_privoxy() { echo "${PROXY_PIDDIR}/privoxy.pid"; }
-proxy_pidfile_haproxy() { echo "${PROXY_PIDDIR}/haproxy.pid"; }
-
-proxy_is_pid_running() {
-  local pidfile="$1" pid=""
-  [[ -r "$pidfile" ]] || return 1
-  pid="$(cat "$pidfile" 2>/dev/null || true)"
-  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
-  kill -0 "$pid" >/dev/null 2>&1
-}
-
-proxy_start_privoxy() {
-  proxy_state_init
-  proxy_is_pid_running "$(proxy_pidfile_privoxy)" && { ok "privoxy already running."; return 0; }
-
-  # Privoxy foreground mode is --no-daemon (varies by build). Use it if present, else fall back.
-  local logf="${LOG_DIR:-${HOME}/.iiab-android/logs}/privoxy.log"
-  if privoxy --help 2>&1 | grep -q -- '--no-daemon'; then
-    nohup privoxy --no-daemon "${PRIVOXY_CFG}" >>"$logf" 2>&1 &
-  else
-    nohup privoxy "${PRIVOXY_CFG}" >>"$logf" 2>&1 &
-  fi
-  echo $! >"$(proxy_pidfile_privoxy)"
-  sleep 0.2
-  proxy_is_pid_running "$(proxy_pidfile_privoxy)" || { warn_red "privoxy failed to start (see $logf)"; return 1; }
-  ok "privoxy started (pid=$(cat "$(proxy_pidfile_privoxy)"))."
-  return 0
-}
-
-proxy_start_haproxy() {
-  proxy_state_init
-  proxy_is_pid_running "$(proxy_pidfile_haproxy)" && { ok "haproxy already running."; return 0; }
-
-  local logf="${LOG_DIR:-${HOME}/.iiab-android/logs}/haproxy.log"
-  # -db keeps in foreground; we background via nohup
-  nohup haproxy -db -f "${HAPROXY_CFG}" >>"$logf" 2>&1 &
-  echo $! >"$(proxy_pidfile_haproxy)"
-  sleep 0.2
-  proxy_is_pid_running "$(proxy_pidfile_haproxy)" || { warn_red "haproxy failed to start (see $logf)"; return 1; }
-  ok "haproxy started (pid=$(cat "$(proxy_pidfile_haproxy)"))."
-  return 0
-}
-
-proxy_stop_one() {
-  local name="$1" pidfile="$2"
-  if proxy_is_pid_running "$pidfile"; then
-    local pid
-    pid="$(cat "$pidfile" 2>/dev/null || true)"
-    kill "$pid" >/dev/null 2>&1 || true
-    sleep 0.2
-    kill -0 "$pid" >/dev/null 2>&1 && kill -9 "$pid" >/dev/null 2>&1 || true
-    rm -f "$pidfile" >/dev/null 2>&1 || true
-    ok "$name stopped."
-  else
-    rm -f "$pidfile" >/dev/null 2>&1 || true
-  fi
-}
-
-proxy_stop_all() {
-  proxy_stop_one "haproxy" "$(proxy_pidfile_haproxy)"
-  proxy_stop_one "privoxy" "$(proxy_pidfile_privoxy)"
-}
-
-proxy_start_all() {
-  proxy_require_local_configs || return 1
-  proxy_start_privoxy || return 1
-  proxy_start_haproxy || return 1
-  return 0
-}
-
-# -------------
-# Session lock (detect ongoing proxy session in Termux shell)
-# -------------
-proxy_session_file() { echo "${PROXY_STATE}/session.pid"; }
-
-# Write current iiab-termux PID as "active proxy session"
-proxy_session_mark_active() {
-  proxy_state_init
-  printf '%s\n' "$$" >"$(proxy_session_file)" 2>/dev/null || true
-}
-
-# Echo active PID only if still alive
-proxy_session_active_pid() {
-  local pid=""
-  [[ -r "$(proxy_session_file)" ]] || return 1
-  pid="$(cat "$(proxy_session_file)" 2>/dev/null || true)"
-  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
-  kill -0 "$pid" >/dev/null 2>&1 || return 1
-  printf '%s\n' "$pid"
-}
-
-proxy_session_is_active() { proxy_session_active_pid >/dev/null 2>&1; }
-proxy_session_is_mine() {
-  local pid=""
-  [[ -r "$(proxy_session_file)" ]] || return 1
-  pid="$(cat "$(proxy_session_file)" 2>/dev/null || true)"
-  [[ "$pid" == "$$" ]]
-}
-
-proxy_session_clear_if_mine() {
-  proxy_session_is_mine || return 0
-  rm -f "$(proxy_session_file)" >/dev/null 2>&1 || true
-}
-
-proxy_session_clear_any() {
-  rm -f "$(proxy_session_file)" >/dev/null 2>&1 || true
-}
-
-# -------------
-# Enable/Disable (ADB global http_proxy)
-# -------------
-proxy_enable() {
-  proxy_state_init
-  require_adb_connected || return 1
-
-  proxy_start_all || return 1
-
-  local cur
-  cur="$(proxy_get_http_proxy 2>/dev/null || true)"
-  cur="${cur:-:0}"
-  if proxy_is_ours_value "$cur"; then
-    ok "Android http_proxy already set to our proxy: ${PRIVOXY_LISTEN}"
-  else
-    # Save previous only if it was meaningful and not ":0"
-    if ! proxy_is_none_value "$cur"; then
-      proxy_write_prev_proxy "$cur"
-      log "Saved previous Android http_proxy: $cur"
-    else
-      # Treat "none" as ":0" so restore_best_effort can revert it.
-      proxy_write_prev_proxy ":0"
-    fi
-    proxy_set_http_proxy "${PRIVOXY_LISTEN}" || {
-      warn_red "Failed to set Android http_proxy"
-      proxy_clear_prev_proxy
-      return 1
-    }
-    ok "Android http_proxy set to: ${PRIVOXY_LISTEN}"
-  fi
-
-  proxy_enable_flag_on
-  ok "Proxy enabled."
-}
-
-proxy_disable() {
-  proxy_state_init
-  require_adb_connected || return 1
-
-  local cur
-  cur="$(proxy_get_http_proxy)"
-
-  if proxy_is_ours_value "$cur"; then
-    # Restore if we saved something
-    if [[ -f "$(proxy_restore_flag)" && -r "$(proxy_prev_file)" ]]; then
-      local prev
-      prev="$(cat "$(proxy_prev_file)" 2>/dev/null || true)"
-      if [[ -n "$prev" ]]; then
-        if proxy_set_http_proxy "$prev"; then
-          ok "Restored previous Android http_proxy: $prev"
-        else
-          warn_red "Failed to restore Android http_proxy. Keeping services running; try --proxy-reset again."
-          return 1
-        fi
-      else
-        if proxy_set_http_proxy ":0"; then
-          ok "Cleared Android http_proxy (:0)"
-        else
-          warn_red "Failed to clear Android http_proxy. Keeping services running; try --proxy-reset again."
-          return 1
-        fi
-      fi
-    else
-      if proxy_set_http_proxy ":0"; then
-        ok "Cleared Android http_proxy (:0)"
-      else
-        warn_red "Failed to clear Android http_proxy. Keeping services running; try --proxy-reset again."
-        return 1
-      fi
-    fi
-  else
-    warn "Android http_proxy is not ours (current='$cur'); not changing it."
-  fi
-
-  proxy_disable_flag_off
-  proxy_stop_all
-  proxy_clear_prev_proxy
-  proxy_session_clear_any
-  ok "Proxy disabled."
-}
-
-proxy_status() {
-  proxy_state_init
-  local cur
-  cur="$(proxy_get_http_proxy 2>/dev/null || true)"
-
-  echo "[proxy] enabled_flag=$(proxy_is_enabled && echo yes || echo no)"
-  echo "[proxy] session_active=$(proxy_session_is_active && echo yes || echo no)"
-  echo "[proxy] android_http_proxy=${cur:-<empty>}"
-  echo "[proxy] haproxy_running=$(proxy_is_pid_running "$(proxy_pidfile_haproxy)" && echo yes || echo no)"
-  echo "[proxy] privoxy_running=$(proxy_is_pid_running "$(proxy_pidfile_privoxy)" && echo yes || echo no)"
-}
-
-# -------------
-# Start proxy hooks
-# -------------
-# Start proxy daemons only (no Android settings changes)
-proxy_start_services() {
-  proxy_start_all
-}
-
-# Stop proxy daemons best-effort (never fail callers)
-proxy_stop_services_best_effort() {
-  proxy_stop_all || true
-  return 0
-}
-
-# IMPORTANT: do NOT stop privoxy/haproxy if we cannot restore Android http_proxy,
-# otherwise the phone may lose Internet connectivity.
-proxy_cleanup_on_exit() {
-  # Run only once even if trap fires multiple times (INT/TERM + EXIT).
-  [[ "${_PROXY_TRAP_DONE:-0}" -eq 1 ]] && return 0
-  _PROXY_TRAP_DONE=1
-
-  proxy_feature_enabled || return 0
-  proxy_state_init
-
-  # If we're the session owner, clear our lock on normal exit paths.
-  proxy_session_clear_if_mine >/dev/null 2>&1 || true
-
-  # If we changed Android http_proxy and ADB is alive, restore it first.
-  if [[ -f "${PROXY_STATE}/restore_needed" ]] && proxy_adb_alive; then
-    proxy_restore_android_http_proxy_best_effort >/dev/null 2>&1 || true
-    proxy_stop_services_best_effort >/dev/null 2>&1 || true
-    return 0
-  fi
-
-  # If ADB is alive, we can check whether Android http_proxy is still ours.
-  # If it's NOT ours, it is safe to stop services.
-  if proxy_adb_alive; then
-    local cur=""
-    cur="$(proxy_get_http_proxy 2>/dev/null || true)"
-    if ! proxy_is_ours_value "$cur"; then
-      proxy_stop_services_best_effort >/dev/null 2>&1 || true
-    fi
-    return 0
-  fi
-
-  # No ADB + restore_needed may still be set -> keep services running to avoid cutting connectivity.
-  return 0
-}
-
-# Enable proxy feature best-effort (used during service startup)
-# Only acts if user enabled it previously (state flag exists).
-proxy_maybe_enable_feature() {
-  [[ "${PROXY_ADB:-0}" -eq 1 ]] || return 0
-  proxy_is_enabled || return 0
-  proxy_enable || true
-  return 0
-}
-
-# Android 14+ (SDK >= 34):
-# Ensure "Disable child process restrictions" is effectively enabled (i.e., monitor phantom procs DISABLED).
-# Return 0 only if verified disabled (or not applicable). Return 1 if required but cannot enforce/verify.
-proxy_android14_disable_phantom_monitor_or_fail() {
-  [[ "${PROXY_ADB:-0}" -eq 1 ]] || return 0
-
-  require_adb_connected >/dev/null 2>&1 || return 1
-
-  local serial sdk mon mon_fflag
-  serial="$(adb_pick_loopback_serial 2>/dev/null || true)"
-  [[ -n "$serial" ]] || return 1
-
-  sdk="$(adb -s "$serial" shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
-  if [[ ! "$sdk" =~ ^[0-9]+$ ]] || (( sdk < 34 )); then
-    return 0
-  fi
-
-  # Read current state (prefer fflag helper, fallback to settings)
-  mon="$(adb_get_monitor_phantom_procs "$serial")"
-
-  if [[ "$mon" == "false" ]]; then
-    ok "Android 14+: child process restrictions already disabled (monitor=false)."
-    return 0
-  fi
-
-  warn "Android 14+: enabling 'Disable child process restrictions' via ADB (monitor currently: $mon)."
-
-  # Try to disable via settings (common backing store)
-  # Some builds accept 0/1, others accept false/true. Try both.
-  adb -s "$serial" shell settings put global settings_enable_monitor_phantom_procs 0 >/dev/null 2>&1 || true
-  adb -s "$serial" shell settings put global settings_enable_monitor_phantom_procs false >/dev/null 2>&1 || true
-
-  # Optional: also try device_config flag if your helper relies on it (harmless if unsupported)
-  # Keep this best-effort, since device_config may require additional privileges on some ROMs.
-  adb -s "$serial" shell device_config put activity_manager settings_enable_monitor_phantom_procs false >/dev/null 2>&1 || true
-  adb -s "$serial" shell device_config put activity_manager enable_monitor_phantom_procs false >/dev/null 2>&1 || true
-
-  # Re-read to verify
-  mon="$(adb_get_monitor_phantom_procs "$serial")"
-
-  if [[ "$mon" == "false" ]]; then
-    ok "Android 14+: child process restrictions disabled successfully (monitor=false)."
-    return 0
-  fi
-
-  warn_red "Android 14+: could not disable/verify child process restrictions (monitor=$mon)."
-  warn "Open Developer Options and enable: 'Disable child process restrictions', then re-run."
-  return 1
-}
-
-proxy_android12_13_disable_phantom_monitor_or_fail() {
-  [[ "${PROXY_ADB:-0}" -eq 1 ]] || return 0
-  require_adb_connected >/dev/null 2>&1 || return 1
-
-  local serial sdk target cur ds
-  serial="$(adb_pick_loopback_serial 2>/dev/null || true)"
-  [[ -n "$serial" ]] || return 1
-
-  sdk="$(adb -s "$serial" shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
-  if [[ ! "$sdk" =~ ^[0-9]+$ ]] || (( sdk < 31 || sdk > 33 )); then
-    return 0
-  fi
-
-  # Default target is 256. Allow override.
-  target="${PROXY_PPK_TARGET:-256}"
-
-  # Helper: best-effort read effective value from dumpsys
-  _ppk_read_effective() {
-    ds="$(adb -s "$serial" shell dumpsys activity settings 2>/dev/null | tr -d '\r' || true)"
-    printf '%s\n' "$ds" \
-      | grep -m1 -E 'max_phantom_processes=' \
-      | sed -E 's/.*max_phantom_processes=([0-9]+).*/\1/' \
-      | tr -d '[:space:]' || true
+  boxyproxy_is_installed || {
+    warn "boxyproxy.py not installed yet. Installing now..."
+    boxyproxy_install_or_update || return 1
   }
 
-  cur="$(_ppk_read_effective)"
-  [[ "$cur" =~ ^[0-9]+$ ]] || cur="32"
-
-  if [[ "$cur" =~ ^[0-9]+$ ]] && (( cur >= target )); then
-    ok "Android 12/13: PPK already OK (max_phantom_processes=$cur, target=$target)."
-    return 0
+  local -a args=()
+  if [[ -n "${BOXYPROXY_ARGS:-}" ]]; then
+    args=( $BOXYPROXY_ARGS )
   fi
+  "$BOXYPROXY_BIN" -d \
+    --pidfile "$BOXYPROXY_PIDFILE" \
+    --logfile "$BOXYPROXY_LOG" \
+    "${args[@]}" >/dev/null 2>&1 || true
 
-  warn "Android 12/13: raising phantom process limit (current: $cur, target: $target)..."
-
-  # Apply via both paths
-  adb -s "$serial" shell settings put global max_phantom_processes "$target" >/dev/null 2>&1 || true
-  adb -s "$serial" shell device_config put activity_manager max_phantom_processes "$target" >/dev/null 2>&1 || true
-
-  # Verify again
-  cur="$(_ppk_read_effective)"
-  if [[ "$cur" =~ ^[0-9]+$ ]] && (( cur >= target )); then
-    ok "Android 12/13: PPK fixed successfully (max_phantom_processes=$cur)."
-    return 0
-  fi
-
-  warn_red "Android 12/13: failed to fix PPK (effective max_phantom_processes=${cur:-unknown}, target=$target)."
-  return 1
+  "$BOXYPROXY_BIN" --status --pidfile "$BOXYPROXY_PIDFILE" 2>/dev/null | indent || true
+  boxyproxy_is_running || { warn_red "boxyproxy failed to start (see $BOXYPROXY_LOG)"; return 1; }
+  ok "boxyproxy started."
+  return 0
 }
 
-proxy_reconcile_on_startup() {
-  proxy_state_init
-
-  # We only want to auto-recover when we have evidence that Android http_proxy was changed
-  # and we didn't restore it (e.g., Termux crash). "enabled" alone is not enough.
-  if [[ ! -f "$(proxy_restore_flag)" ]]; then
-    return 0
-  fi
-
-  local active_pid=""
-  active_pid="$(proxy_session_active_pid 2>/dev/null || true)"
-  if [[ -n "$active_pid" ]]; then
-    log_yel "Proxy notice: an active proxy session seems to be running in another Termux shell (pid=${active_pid})."
-    log_yel "If that's the case, you can ignore 'recovery' messaging from this shell."
-  else
-    warn_red "Proxy recovery: it looks like the previous proxy session did not exit cleanly (restore_needed)."
-  fi
-
-  local hap_ok=0 pri_ok=0
-  proxy_is_pid_running "$(proxy_pidfile_haproxy)" && hap_ok=1
-  proxy_is_pid_running "$(proxy_pidfile_privoxy)" && pri_ok=1
-
-  if require_adb_connected >/dev/null 2>&1; then
-    local cur
-    cur="$(proxy_get_http_proxy 2>/dev/null || true)"
-    cur="${cur:-:0}"
-    ok "Android global http_proxy: ${cur}"
-
-    if proxy_is_ours_value "$cur"; then
-      if (( hap_ok == 0 || pri_ok == 0 )); then
-        warn "Android http_proxy points to the local proxy, but haproxy/privoxy are not running. Attempting emergency restore..."
-        if proxy_start_services; then
-          ok "Emergency services restored (Privoxy/HAProxy)."
-        else
-          warn "Could not start services. The phone may have no Internet connectivity."
-        fi
-      else
-        ok "haproxy/privoxy are already running."
-      fi
-
-      warn "To return to normal (remove Android global proxy): iiab-termux --proxy-reset"
-      warn "For a full diagnosis: iiab-termux --proxy-status"
-    else
-      # Android proxy is not ours anymore; state is stale -> clean up.
-      ok "Android global proxy no longer points to the local proxy. Clearing stale recovery state."
-      proxy_clear_prev_proxy
-    fi
-    return 0
-  fi
-
-  # No ADB: best-effort recovery. We have restore_needed, so try to keep connectivity.
-  warn "ADB is not connected: cannot confirm Android global http_proxy."
-
-  if (( hap_ok == 0 || pri_ok == 0 )); then
-    warn "restore_needed is set; attempting to start services to avoid leaving you without Internet."
-    if proxy_start_services; then
-      ok "Emergency services restored (Privoxy/HAProxy)."
-    else
-      warn "Could not start services. The phone may have no Internet connectivity."
-    fi
-  else
-    ok "haproxy/privoxy are already running."
-  fi
-
-  warn "Connect ADB and run: iiab-termux --proxy-status"
-  warn "If it confirms the global proxy is still active, run: iiab-termux --proxy-reset"
+boxyproxy_stop() {
+  boxyproxy_state_init
+  boxyproxy_is_installed || return 0
+  "$BOXYPROXY_BIN" --stop --pidfile "$BOXYPROXY_PIDFILE" 2>/dev/null | indent || true
+  return 0
 }
 
-# ---- END 70_mod_iiab_proxy_adb.sh ----
+boxyproxy_status() {
+  boxyproxy_state_init
+  boxyproxy_is_installed || { echo "[boxyproxy] installed=no"; return 0; }
+  "$BOXYPROXY_BIN" --status --pidfile "$BOXYPROXY_PIDFILE" 2>/dev/null || true
+  echo "[boxyproxy] bin=$BOXYPROXY_BIN"
+  echo "[boxyproxy] raw_url=$BOXYPROXY_RAW_URL"
+  echo "[boxyproxy] log=$BOXYPROXY_LOG"
+}
+
+# ---- END 70_mod_boxyproxy.sh ----
 
 
 # ---- BEGIN 99_main.sh ----
@@ -2741,26 +2238,18 @@ BASELINE_ERR=""
 RESET_IIAB=0
 ONLY_CONNECT=0
 
-# Optional feature gate: Android HTTP proxy + local haproxy/privoxy
-# Enabled only when explicitly requested.
-PROXY_ADB="${PROXY_ADB:-0}"   # 1=enable proxy feature, 0=disabled
-
 CHECK_NO_ADB=0
 CHECK_SDK=""
 CHECK_MON=""
 CHECK_PPK=""
 
 # Modes are mutually exclusive (baseline is default)
-MODE="baseline"      # baseline|with-adb|adb-only|connect-only|ppk-only|check|all|login|proxy-status|proxy-reset
-
-PROXY_SESSION_ACTIVE=0
-PROXY_KEEP_SERVICES=0
-PROXY_PROVISION=0   # set by --proxy-iiab (provision once, not on --login)
+MODE="baseline"      # baseline|with-adb|adb-only|connect-only|ppk-only|check|all|login
 
 MODE_SET=0
 CONNECT_PORT_FROM=""   # "", "flag", "positional"
 
-trap 'proxy_cleanup_on_exit >/dev/null 2>&1 || true; power_mode_login_exit >/dev/null 2>&1 || true; adb_hint_notif_remove >/dev/null 2>&1 || true; cleanup_notif >/dev/null 2>&1 || true; release_wakelock >/dev/null 2>&1 || true' EXIT INT TERM
+trap 'power_mode_login_exit >/dev/null 2>&1 || true; adb_hint_notif_remove >/dev/null 2>&1 || true; cleanup_notif >/dev/null 2>&1 || true; release_wakelock >/dev/null 2>&1 || true' EXIT INT TERM
 
 # NOTE: Termux:API prompts live in 40_mod_termux_api.sh
 
@@ -2796,146 +2285,6 @@ guard_no_iiab_termux_in_proot() {
 }
 
 guard_no_iiab_termux_in_proot
-
-# -------------------------
-# Proxy feature (guarded behind PROXY_ADB=1)
-# -------------------------
-proxy_feature_enabled() {
-  [[ "${PROXY_ADB:-0}" -eq 1 ]]
-}
-
-proxy_restore_android_http_proxy_best_effort() {
-  # Restore only if we changed it in this run (restore_needed stamp).
-  proxy_feature_enabled || return 0
-  proxy_state_init
-  [[ -f "${PROXY_STATE}/restore_needed" ]] || return 0
-  proxy_adb_alive || return 0
-
-  local prev=""
-  prev="$(cat "${PROXY_STATE}/prev_http_proxy" 2>/dev/null || true)"
-  if proxy_is_none_value "$prev"; then
-    proxy_set_http_proxy ":0" || true
-  else
-    proxy_set_http_proxy "$prev" || true
-  fi
-  proxy_clear_prev_proxy
-  ok "Proxy: restored Android http_proxy (best effort)."
-}
-
-proxy_prepare_enable_if_requested() {
-  proxy_feature_enabled || return 0
-  proxy_maybe_enable_feature
-}
-
-proxy_enter_session_if_requested() {
-  # Called just before --login enters proot (so browser traffic works while inside IIAB Debian).
-  proxy_feature_enabled || return 0
-
-  # Require that --proxy-iiab was run at least once (provisioning stamp exists).
-  if ! proxy_is_provisioned; then
-    warn "Proxy: not provisioned yet; skipping activation. Run once: iiab-termux --proxy-iiab"
-    return 0
-  fi
-
-  # PROXY mode => ADB must be connected. If not, force the wizard (equivalent to --adb-only).
-  if ! require_adb_connected >/dev/null 2>&1; then
-    log_yel "Proxy: PROXY mode requested; ADB is not connected. Starting Wireless ADB wizard..."
-    if sdk_le 29; then
-      warn "Android 8-10: Wireless ADB pairing/connect is not available; cannot enforce proxy via ADB."
-      return 1
-    fi
-    adb_pair_connect_if_needed || true
-    if ! require_adb_connected >/dev/null 2>&1; then
-      warn "Proxy: ADB still not connected after wizard; continuing WITHOUT proxy."
-      return 1
-    fi
-  fi
-
-  # ADB is connected here.
-  if proxy_adb_alive; then
-    # Android 12/13: hard gate
-    if ! proxy_android12_13_disable_phantom_monitor_or_fail; then
-      warn_red "Proxy: Android 12/13 PPK could not set to 256; refusing to enable proxy."
-      return 1
-    fi
-    # Android 14+: hard gate
-    if ! proxy_android14_disable_phantom_monitor_or_fail; then
-      warn_red "Proxy: Android 14+ phantom monitor could not be disabled/verified; refusing to enable proxy."
-      return 1
-    fi
-      # Save current http_proxy for restoration on exit.
-      local cur=""
-      cur="$(proxy_get_http_proxy 2>/dev/null || true)"
-      cur="${cur:-:0}"
-      if proxy_is_ours_value "$cur"; then
-        # If we're already on our proxy but no restore flag exists, assume stale state and plan to clear on exit.
-        if [[ ! -f "$(proxy_restore_flag)" ]]; then
-          proxy_write_prev_proxy ":0"
-        fi
-        log "Proxy: Android http_proxy already points to our proxy (${PRIVOXY_LISTEN})."
-      else
-        if proxy_is_none_value "$cur"; then proxy_write_prev_proxy ":0"; else proxy_write_prev_proxy "$cur"; fi
-        if proxy_set_http_proxy "${PRIVOXY_LISTEN}"; then
-          ok "Proxy: set Android http_proxy -> ${PRIVOXY_LISTEN}"
-        else
-          warn_red "Proxy: failed to set Android http_proxy"
-          proxy_clear_prev_proxy
-          return 1
-        fi
-      fi
-  fi
-
-  # Start local services. If they fail, restore Android proxy.
-  if ! proxy_start_services; then
-    warn_red "Proxy: failed to start privoxy/haproxy or healthcheck failed."
-    proxy_restore_android_http_proxy_best_effort || true
-    proxy_stop_services_best_effort || true
-    return 1
-  fi
-
-  ok "Proxy: services started and ready (Privoxy ${PRIVOXY_LISTEN} -> HAProxy ${HAPROXY_LISTEN})."
-  PROXY_SESSION_ACTIVE=1
-  proxy_enable_flag_on
-  proxy_session_mark_active
-  return 0
-}
-
-proxy_exit_session_if_requested() {
-  proxy_feature_enabled || return 0
-  proxy_state_init
-
-  # Only do "forced ADB restore" if we actually entered a proxy session
-  # (strong evidence: restore_needed OR in-memory flag).
-  if [[ "${PROXY_SESSION_ACTIVE:-0}" -ne 1 && ! -f "$(proxy_restore_flag)" ]]; then
-    return 0
-  fi
-
-  if ! require_adb_connected >/dev/null 2>&1; then
-    log_yel "Proxy: this session started in PROXY mode; closing it requires restoring Android http_proxy."
-    log_yel "Starting Wireless ADB wizard now..."
-    adb_pair_connect_if_needed || true
-
-    if ! require_adb_connected >/dev/null 2>&1; then
-      if tty_yesno_default_y "[iiab] ADB still not connected. Retry wizard once more? [Y/n]: "; then
-        adb_pair_connect_if_needed || true
-      fi
-    fi
-  fi
-
-  if ! require_adb_connected >/dev/null 2>&1; then
-    warn_red "Proxy: cannot restore Android http_proxy without ADB."
-    warn "Keeping privoxy/haproxy running to avoid cutting Internet."
-    warn "As soon as ADB is available, run: iiab-termux --proxy-reset"
-    return 0
-  fi
-
-  proxy_restore_android_http_proxy_best_effort || true
-  proxy_stop_services_best_effort || true
-  proxy_disable_flag_off || true
-  proxy_session_clear_if_mine || true
-  PROXY_SESSION_ACTIVE=0
-  return 0
-}
 
 # -------------------------
 # Self-check
@@ -2981,7 +2330,7 @@ baseline_bail() {
 
 final_advice() {
   case "${MODE:-}" in
-    login|proxy-status|proxy-reset) return 0 ;;
+    login) return 0 ;;
   esac
   if [[ "${BASELINE_OK:-0}" -ne 1 ]]; then
     warn_red "Baseline is not ready, so ADB prompts / IIAB Debian bootstrap may be unavailable."
@@ -3114,20 +2463,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --with-adb) set_mode "with-adb"; shift ;;
     --adb-only) set_mode "adb-only"; shift ;;
-    --proxy-iiab)
-      PROXY_ADB=1
-      # Provision proxy bits once (pkgs + configs)
-      PROXY_PROVISION=1
-      shift
-      ;;
-    --proxy-status)
-      set_mode "proxy-status"
-      shift
-      ;;
-    --proxy-reset)
-      set_mode "proxy-reset"
-      shift
-      ;;
     --login) set_mode "login"; shift ;;
     --connect-only)
       set_mode "connect-only"
@@ -3267,49 +2602,15 @@ main() {
   sanitize_timeout
   acquire_wakelock
 
-  # If user requested proxy provisioning, do it once here (no activation, no login needed).
-  if [[ "${PROXY_PROVISION:-0}" -eq 1 ]]; then
-    proxy_provision || die "Proxy provisioning failed."
-  fi
-
   case "$MODE" in
-    proxy-status)
-      proxy_reconcile_on_startup || true
-      proxy_status
-      exit 0
-      ;;
-    proxy-reset)
-      # If ADB isn't connected, force the wizard (same intent as --adb-only).
-      if ! require_adb_connected >/dev/null 2>&1; then
-        log_yel "Proxy reset: ADB is not connected. Starting Wireless ADB wizard..."
-        if sdk_le 29; then
-          die "Android 8-10: Wireless debugging pairing is not available; cannot reset proxy via ADB."
-        fi
-        adb_pair_connect_if_needed || true
-      fi
-
-      # Still no ADB -> we cannot safely restore Android http_proxy. Keep restore_needed.
-      require_adb_connected || die "Proxy reset: still no ADB. Cannot restore Android http_proxy. Try again, then run: iiab-termux --proxy-reset"
-
-      proxy_disable
-      exit 0
-      ;;
     login)
-    # Only enable proxy feature if explicitly requested.
-    # We do it immediately before login so it doesn't run during baseline installs.
-    if proxy_feature_enabled; then
-      proxy_enter_session_if_requested || {
-        warn_red "Proxy: could not enter proxy session; continuing without proxy."
-      }
-    fi
     iiab_login
-    # Cleanup after returning from proot login.
-    proxy_exit_session_if_requested || true
       ;;
     baseline)
       power_mode_offer_battery_settings_once || true
       repo_selector_ask_configure
       step_termux_base || baseline_bail
+      boxyproxy_install_or_update || true
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
       ;;
@@ -3318,6 +2619,7 @@ main() {
       power_mode_offer_battery_settings_once || true
       repo_selector_ask_configure
       step_termux_base || baseline_bail
+      boxyproxy_install_or_update || true
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
       # Android 8-10: skip ADB (no Wireless debugging pairing).
@@ -3354,6 +2656,7 @@ main() {
       repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
+      boxyproxy_install_or_update || true
       install_iiab_android_cmd || true
       ;;
 
@@ -3367,6 +2670,8 @@ main() {
       repo_selector_ask_configure
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
+      boxyproxy_install_or_update || true
+      #boxyproxy_start || true # enable on stage 2
       install_iiab_android_cmd || true
       if sdk_is_num && (( ANDROID_SDK >= 34 )); then
         # Android 14+
@@ -3396,15 +2701,8 @@ main() {
 
   self_check
   ok "iiab-termux completed (mode=$MODE)."
-  log "---- Mode list ----"
-  log "Connect-only             --connect-only [PORT]"
-  log "Pair+connect             --adb-only [--connect-port PORT]"
-  log "Login (proot)            --login"
-  log "Check                    --check"
-  log "Apply PPK                --ppk-only"
-  log "Base+IIAB Debian+Pair+connect --with-adb"
-  log "Full run                 --all"
-  log "Reset IIAB Debian env    --reset-iiab"
+  log "Please check the complete mode list using:"
+  log "iiab-termux --help"
   log "-------------------"
   final_advice
 }
