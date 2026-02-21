@@ -183,12 +183,11 @@ final_advice() {
           : # Restrictions already disabled -> ok to continue
         else
           if [[ "${mon:-}" == "true" ]]; then
-            advice_warn_bad "Android 14+: child process restrictions appear ENABLED (monitor=true)."
+            log_yel "Android 14+: child process restrictions appear ENABLED (monitor=true)."
           else
-            warn "Android 14+: child process restrictions haven't been verified (monitor flag unreadable/unknown)."
+            log_yel "Android 14+: child process restrictions haven't been verified (monitor flag unreadable/unknown)."
           fi
-          warn "For Android 14 and later, there is no strict need to connect to ADB, on the other hand:"
-          warn "Please make sure to set 'Disable child process restrictions' enabled; otherwise the installation may fail."
+          log_yel "Please make sure to set 'Disable child process restrictions' enabled; otherwise the installation may fail."
           return 0
         fi
       fi

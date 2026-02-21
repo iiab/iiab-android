@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# GENERATED FILE: 2026-02-20T20:46:11-06:00 - do not edit directly.
+# GENERATED FILE: 2026-02-20T21:32:47-06:00 - do not edit directly.
 # Source modules: termux-setup/*.sh + manifest.sh
 # Rebuild: (cd termux-setup && bash build_bundle.sh)
 # -----------------------------------------------------------------------------
@@ -2224,7 +2224,7 @@ self_check_android_flags() {
 
   local serial sdk rel mon mon_fflag ds ppk_eff
   serial="$(adb_pick_loopback_serial 2>/dev/null)" || {
-    warn "ADB: no loopback device connected. Tip: run --adb-only (pair+connect) or --check for more info."
+    log "ADB: no loopback device connected. Tip: run --adb-only or --check if you require it."
     return 0
   }
 
@@ -2584,12 +2584,11 @@ final_advice() {
           : # Restrictions already disabled -> ok to continue
         else
           if [[ "${mon:-}" == "true" ]]; then
-            advice_warn_bad "Android 14+: child process restrictions appear ENABLED (monitor=true)."
+            log_yel "Android 14+: child process restrictions appear ENABLED (monitor=true)."
           else
-            warn "Android 14+: child process restrictions haven't been verified (monitor flag unreadable/unknown)."
+            log_yel "Android 14+: child process restrictions haven't been verified (monitor flag unreadable/unknown)."
           fi
-          warn "For Android 14 and later, there is no strict need to connect to ADB, on the other hand:"
-          warn "Please make sure to set 'Disable child process restrictions' enabled; otherwise the installation may fail."
+          log_yel "Please make sure to set 'Disable child process restrictions' enabled; otherwise the installation may fail."
           return 0
         fi
       fi

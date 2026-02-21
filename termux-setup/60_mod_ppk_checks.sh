@@ -278,7 +278,7 @@ self_check_android_flags() {
 
   local serial sdk rel mon mon_fflag ds ppk_eff
   serial="$(adb_pick_loopback_serial 2>/dev/null)" || {
-    warn "ADB: no loopback device connected. Tip: run --adb-only (pair+connect) or --check for more info."
+    log "ADB: no loopback device connected. Tip: run --adb-only or --check if you require it."
     return 0
   }
 
