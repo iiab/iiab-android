@@ -117,9 +117,8 @@ boxyproxy_status() {
     fi
   fi
 
-  # Report current state vs intended configuration
+  # Report current running state
   boxyp_log "walled-garden (active): $running_no_ext"
-  boxyp_log "walled-garden (intended): $([[ "${BOXYPROXY_NO_EXTERNAL:-0}" -eq 1 ]] && echo "yes" || echo "no")"
 
   boxyp_log "bin=$BOXYPROXY_BIN"
   boxyp_log "raw_url=$BOXYPROXY_RAW_URL"

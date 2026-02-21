@@ -299,38 +299,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-all_optional_adb_connect_and_check() {
-  # Args:
-  #   $1 = label (e.g. "Android 14+" or "Android 11")
-  #   $2 = reminder line (can be "")
-
-  local label="${1:-Android}"
-  local reminder="${2:-}"
-
-  local serial=""
-
-  if have adb; then
-    adb start-server >/dev/null 2>&1 || true
-    if serial="$(adb_pick_loopback_serial 2>/dev/null)"; then
-      ok "ADB already connected: $serial (running checks, no prompts)."
-      check_readiness || true
-      return 0
-    fi
-  fi
-
-  if tty_yesno_default_y "[iiab] ${label}: Connect via Wireless ADB now (recommended)? [Y/n]: "; then
-    adb_pair_connect_if_needed
-    check_readiness || true
-    return 0
-  fi
-
-  warn "Continuing without ADB (${label})."
-  [[ -n "$reminder" ]] && warn "$reminder"
-  CHECK_NO_ADB=1
-  CHECK_SDK="${ANDROID_SDK:-}"
-  return 0
-}
-
 sdk_is_num() { [[ "${ANDROID_SDK:-}" =~ ^[0-9]+$ ]]; }
 sdk_le() { local n="$1"; sdk_is_num && (( ANDROID_SDK <= n )); }
 sdk_eq() { local n="$1"; sdk_is_num && (( ANDROID_SDK == n )); }
@@ -485,17 +453,21 @@ main() {
       install_iiab_android_cmd || true
       if sdk_is_num && (( ANDROID_SDK >= 34 )); then
         # Android 14+
-        all_optional_adb_connect_and_check \
-          "Android 14+" \
-          "Reminder: enable Developer Options -> 'Disable child process restrictions' (otherwise installs may fail)."
+        log_yel "Android 14+: Skipping ADB setup."
+        log_yel "Reminder: enable Developer Options -> 'Disable child process restrictions' (otherwise installs may fail)."
+        CHECK_NO_ADB=1
+        CHECK_SDK="${ANDROID_SDK:-}"
       elif sdk_eq 30; then
         # Android 11
-        all_optional_adb_connect_and_check \
-          "Android 11" \
-          "Note: Wireless debugging is optional here; installs usually work without ADB."
+        log_yel "Android 11: Skipping ADB setup."
+        log_yel "Note: Wireless debugging is optional here; installs usually work without ADB."
+        CHECK_NO_ADB=1
+        CHECK_SDK="${ANDROID_SDK:-}"
       elif sdk_le 29; then
         # Android 8-10
         warn_skip_adb_pre11
+        CHECK_NO_ADB=1
+        CHECK_SDK="${ANDROID_SDK:-}"
       else
         # Android 12-13 (SDK 31-33): ADB + PPK still needed
         adb_pair_connect_if_needed

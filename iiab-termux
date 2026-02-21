@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# GENERATED FILE: 2026-02-20T18:06:00-06:00 - do not edit directly.
+# GENERATED FILE: 2026-02-20T20:46:11-06:00 - do not edit directly.
 # Source modules: termux-setup/*.sh + manifest.sh
 # Rebuild: (cd termux-setup && bash build_bundle.sh)
 # -----------------------------------------------------------------------------
@@ -248,18 +248,6 @@ iiab_login() {
       warn_red "Android 12-13: adb is missing, so PPK=256 cannot be verified/applied."
       warn "Install adb (android-tools) and run:"
       ok   "  iiab-termux --all"
-    fi
-  elif [[ "$sdk" =~ ^[0-9]+$ ]] && (( sdk >= 34 )); then
-    # Android 14+: rely on 'Disable child process restrictions' (monitor=false).
-    if have adb; then
-      adb start-server >/dev/null 2>&1 || true
-      if adb_pick_loopback_serial >/dev/null 2>&1; then
-        check_readiness || true
-      else
-        warn "Android 14+: ensure 'Disable child process restrictions' is enabled in Developer Options."
-      fi
-    else
-      warn "Android 14+: ensure 'Disable child process restrictions' is enabled in Developer Options."
     fi
   fi
 
@@ -951,13 +939,10 @@ repo_selector_ask_configure() {
 
   log "Detected repo group: "
   printf "> ${BOLD}${BLU}$label${RST}\n"
-  if tty_yesno_default_y "[iiab] Apply this mirror group now? [Y/n]: "; then
-    repo_selector__apply_group "$group" || true
-    ok "Region repo set, continuing with the installation."
-  else
-    log_yel "You are encouraged to manually select a nearby repo using: termux-change-repo"
-    log_yel "Leaving at 'All mirrors' until set manually."
-  fi
+  # Auto-apply to optimize zero-touch installation
+  log "Automatically applying this mirror group to optimize downloads."
+  repo_selector__apply_group "$group" || true
+  ok "Region repo set. You can always change it later by running: termux-change-repo"
 }
 
 # -------------------------
@@ -2402,9 +2387,8 @@ boxyproxy_status() {
     fi
   fi
 
-  # Report current state vs intended configuration
+  # Report current running state
   boxyp_log "walled-garden (active): $running_no_ext"
-  boxyp_log "walled-garden (intended): $([[ "${BOXYPROXY_NO_EXTERNAL:-0}" -eq 1 ]] && echo "yes" || echo "no")"
 
   boxyp_log "bin=$BOXYPROXY_BIN"
   boxyp_log "raw_url=$BOXYPROXY_RAW_URL"
@@ -2716,38 +2700,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-all_optional_adb_connect_and_check() {
-  # Args:
-  #   $1 = label (e.g. "Android 14+" or "Android 11")
-  #   $2 = reminder line (can be "")
-
-  local label="${1:-Android}"
-  local reminder="${2:-}"
-
-  local serial=""
-
-  if have adb; then
-    adb start-server >/dev/null 2>&1 || true
-    if serial="$(adb_pick_loopback_serial 2>/dev/null)"; then
-      ok "ADB already connected: $serial (running checks, no prompts)."
-      check_readiness || true
-      return 0
-    fi
-  fi
-
-  if tty_yesno_default_y "[iiab] ${label}: Connect via Wireless ADB now (recommended)? [Y/n]: "; then
-    adb_pair_connect_if_needed
-    check_readiness || true
-    return 0
-  fi
-
-  warn "Continuing without ADB (${label})."
-  [[ -n "$reminder" ]] && warn "$reminder"
-  CHECK_NO_ADB=1
-  CHECK_SDK="${ANDROID_SDK:-}"
-  return 0
-}
-
 sdk_is_num() { [[ "${ANDROID_SDK:-}" =~ ^[0-9]+$ ]]; }
 sdk_le() { local n="$1"; sdk_is_num && (( ANDROID_SDK <= n )); }
 sdk_eq() { local n="$1"; sdk_is_num && (( ANDROID_SDK == n )); }
@@ -2902,17 +2854,21 @@ main() {
       install_iiab_android_cmd || true
       if sdk_is_num && (( ANDROID_SDK >= 34 )); then
         # Android 14+
-        all_optional_adb_connect_and_check \
-          "Android 14+" \
-          "Reminder: enable Developer Options -> 'Disable child process restrictions' (otherwise installs may fail)."
+        log_yel "Android 14+: Skipping ADB setup."
+        log_yel "Reminder: enable Developer Options -> 'Disable child process restrictions' (otherwise installs may fail)."
+        CHECK_NO_ADB=1
+        CHECK_SDK="${ANDROID_SDK:-}"
       elif sdk_eq 30; then
         # Android 11
-        all_optional_adb_connect_and_check \
-          "Android 11" \
-          "Note: Wireless debugging is optional here; installs usually work without ADB."
+        log_yel "Android 11: Skipping ADB setup."
+        log_yel "Note: Wireless debugging is optional here; installs usually work without ADB."
+        CHECK_NO_ADB=1
+        CHECK_SDK="${ANDROID_SDK:-}"
       elif sdk_le 29; then
         # Android 8-10
         warn_skip_adb_pre11
+        CHECK_NO_ADB=1
+        CHECK_SDK="${ANDROID_SDK:-}"
       else
         # Android 12-13 (SDK 31-33): ADB + PPK still needed
         adb_pair_connect_if_needed

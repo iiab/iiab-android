@@ -238,18 +238,6 @@ iiab_login() {
       warn "Install adb (android-tools) and run:"
       ok   "  iiab-termux --all"
     fi
-  elif [[ "$sdk" =~ ^[0-9]+$ ]] && (( sdk >= 34 )); then
-    # Android 14+: rely on 'Disable child process restrictions' (monitor=false).
-    if have adb; then
-      adb start-server >/dev/null 2>&1 || true
-      if adb_pick_loopback_serial >/dev/null 2>&1; then
-        check_readiness || true
-      else
-        warn "Android 14+: ensure 'Disable child process restrictions' is enabled in Developer Options."
-      fi
-    else
-      warn "Android 14+: ensure 'Disable child process restrictions' is enabled in Developer Options."
-    fi
   fi
 
   ok "Entering IIAB Debian (via: iiab-termux --login)"

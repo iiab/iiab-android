@@ -484,13 +484,10 @@ repo_selector_ask_configure() {
 
   log "Detected repo group: "
   printf "> ${BOLD}${BLU}$label${RST}\n"
-  if tty_yesno_default_y "[iiab] Apply this mirror group now? [Y/n]: "; then
-    repo_selector__apply_group "$group" || true
-    ok "Region repo set, continuing with the installation."
-  else
-    log_yel "You are encouraged to manually select a nearby repo using: termux-change-repo"
-    log_yel "Leaving at 'All mirrors' until set manually."
-  fi
+  # Auto-apply to optimize zero-touch installation
+  log "Automatically applying this mirror group to optimize downloads."
+  repo_selector__apply_group "$group" || true
+  ok "Region repo set. You can always change it later by running: termux-change-repo"
 }
 
 # -------------------------
