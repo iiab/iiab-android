@@ -312,7 +312,7 @@ adb_pair_connect() {
     fi
 
     if [[ "$auto_ports" -ne 1 ]]; then
-      warn "Manual ports needed. On Android open: Settings -> Developer options -> Wireless debugging."
+      warn "Manual ports needed. On Android open: Settings -> System -> Developer Options -> Wireless debugging."
       warn "CONNECT PORT: shown as 'IP address & port' on the Wireless debugging screen."
       warn "PAIR PORT: shown inside 'Pair device with pairing code' dialog (keep it open)."
       echo "[*] Asking CONNECT PORT..."
