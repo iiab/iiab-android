@@ -248,8 +248,6 @@ fi
 #-----------------------------
 # kiwix
 disable_role_32bits kiwix "$LOCAL_VARS_DEST"
-# maps
-disable_role_32bits maps "$LOCAL_VARS_DEST"
 
 #-----------------------------
 # Fetch install.txt with fallback and run it

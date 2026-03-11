@@ -263,12 +263,13 @@ You will then be in a IIAB Debian shell with access to the IIAB CLI (command-lin
 
 ## What about 32-bit?
 
-IIAB on Android can run on older phones with 32-bit processors. However, there are currently a few restrictions with certain apps:
+IIAB on Android runs on older 32-bit devices, and we are making progress! [**Maps is now supported**](https://github.com/iiab/iiab/pull/4302).
 
-* Maps
-* Kiwix
+However, there are still limitations:
 
-These are not yet supported, [but we are working on closing that gap](https://github.com/iiab/iiab-android/issues/35). Please stay tuned for more updates on this architecture!
+* Kiwix: Currently not supported on 32-bit.
+
+While we would love to close [this gap](https://github.com/iiab/iiab-android/issues/35), porting Kiwix to this architecture requires significant development resources. As a result, active development for this feature is currently on hold. Community contributions are welcome if you have the expertise to help us tackle this!
 
 In the meantime, you can try the current state of our pre-built rootfs:
 
