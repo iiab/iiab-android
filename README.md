@@ -75,11 +75,14 @@ This is the foundational build path with no shortcuts. Your device will download
 
 #### :rocket: Option A: Pre-built :rocket:
 
-1. Open Termux and run the following command to install the base tools, download and extract the pre-built IIAB system:
+1. Open Termux and run the following command. This will install the base tools, then automatically download and extract the official pre-built IIAB system for your device:
 
     ```bash
     curl iiab.io/termux.txt | bash -s pull-rootfs
     ```
+
+    > **Tip:** To install a custom image instead, simply append its URL at the end of the command  
+    > (e.g., ...`bash -s pull-rootfs https://domain.com/custom_image.tar.gz`).
 
 2. Once the process finishes successfully, your installation is complete!  
     In order to start it run:
