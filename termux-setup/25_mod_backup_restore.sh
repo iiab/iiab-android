@@ -111,7 +111,23 @@ cmd_pull_rootfs() {
   local target_url="${1:-}"
   local use_meta4="${2:-1}"  # 1 = yes, 0 = no (--no-meta4)
   local keep_tarball="${3:-0}" # 1 = keep, 0 = delete (default)
-  local arch_mismatch_ok="${4:-0}" 
+  local arch_mismatch_ok="${4:-0}"
+
+  if [[ -z "$target_url" || "$target_url" == "AUTO" ]]; then
+    local arch
+    arch="$(get_android_arch)"
+
+    if [[ "$arch" == "arm64-v8a" ]]; then
+      target_url="$IIAB_ROOTFS_URL_ARM64"
+    elif [[ "$arch" == "armeabi-v7a" ]]; then
+      target_url="$IIAB_ROOTFS_URL_ARM32"
+    else
+      die "Arquitectura no soportada para descarga automática: $arch. Especifica una URL manualmente."
+    fi
+
+    log "Seleccionando automáticamente imagen base para $arch:"
+    log "> $target_url"
+  fi
 
   [[ -z "$target_url" ]] && die "You must provide a URL to download the rootfs."
 

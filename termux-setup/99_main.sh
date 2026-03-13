@@ -369,7 +369,8 @@ while [[ $# -gt 0 ]]; do
         BACKUP_RESTORE_TARGET="$2"
         shift 2
       else
-        die "--pull-rootfs requires a URL."
+        BACKUP_RESTORE_TARGET="AUTO"
+        shift 1
       fi
       ;;
     --no-meta4)
@@ -484,8 +485,11 @@ main() {
       ;;
 
     pull-rootfs)
+      run_barebones_logic
       cmd_pull_rootfs "$BACKUP_RESTORE_TARGET" "$PULL_USE_META4" "$PULL_KEEP_TARBALL" "$PULL_ARCH_MISMATCH_OK"
+      self_check
       ;;
+
     remove-iiab)
       cmd_remove_iiab
       ;;

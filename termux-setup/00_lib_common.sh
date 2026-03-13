@@ -68,6 +68,10 @@ get_android_release() { getprop ro.build.version.release 2>/dev/null || true; }
 ANDROID_SDK="$(get_android_sdk)"
 ANDROID_REL="$(get_android_release)"
 
+# Default URLs for auto-pulling rootfs
+IIAB_ROOTFS_URL_ARM64="${IIAB_ROOTFS_URL_ARM64:-https://iiab.switnet.org/android/rootfs/latest_arm64-v8a.meta4}"
+IIAB_ROOTFS_URL_ARM32="${IIAB_ROOTFS_URL_ARM32:-https://iiab.switnet.org/android/rootfs/latest_armeabi-v7a.meta4}"
+
 get_iiab_termux_version() {
   local file="${1:-$0}"
   local raw_ts=""
