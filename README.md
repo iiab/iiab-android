@@ -73,27 +73,42 @@ This is the foundational build path with no shortcuts. Your device will download
 
 ---
 
-#### Option A: Pre-built
+#### :rocket: Option A: Pre-built :rocket:
 
-1. Open Termux and run the following command to install the base tools:
-
-    ```bash
-    curl iiab.io/termux.txt | bash -s barebones
-    ```
-
-2. Download and extract the pre-built IIAB system:
-
-    **For most common modern devices (64-bit):**
+1. Open Termux and run the following command to install the base tools, download and extract the pre-built IIAB system:
 
     ```bash
-    iiab-termux --pull-rootfs https://si-n.cc/latest_arm64-v8a.meta4
+    curl iiab.io/termux.txt | bash -s pull-rootfs
     ```
 
-3. Once the process finishes successfully, your installation is complete!  
-    In order to start it run: `iiab-termux --login`
-4. **Please proceed directly to the [Test your IIAB install](#test-your-iiab-install) section below.**
+2. Once the process finishes successfully, your installation is complete!  
+    In order to start it run:
 
-#### Option B: DIY build
+    ```bash
+    iiab-termux --login
+    ```
+
+    And watch it start:
+
+    ```bash
+    ~ $ iiab-termux --login
+    [iiab] Logging to: ~/.iiab-android/logs/iiab-termux.20260313.log
+    [iiab] Wakelock acquired (termux-wake-lock).
+    [iiab] Baseline stamp found: /data/data/com.termux/files/home/.iiab-android/stamp.termux_base
+    [iiab] Entering IIAB Debian (via: iiab-termux --login)
+    [iiab] Power-mode: enabled for this login session (persistent notification active).
+    [pdsm:calibre-web] running
+    [pdsm:kiwix] running
+    [pdsm:kolibri] running
+    [pdsm:mariadb] running
+    [pdsm:nginx] running
+    [pdsm:php-fpm] running
+    root@localhost:~#
+    ```
+
+3. **Please proceed directly to the [Test your IIAB install](#test-your-iiab-install) section below.**
+
+#### :train2: Option B: DIY build :train2:
 
 1. Open Termux and prepare the full environment:
 
