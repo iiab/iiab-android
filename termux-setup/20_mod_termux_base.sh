@@ -501,6 +501,7 @@ step_termux_base() {
     coreutils
     curl
     gawk
+    git
     grep
     jq
     openssh

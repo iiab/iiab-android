@@ -21,6 +21,9 @@ fi
 #-----------------------------
 # Config
 #-----------------------------
+GIT_REPO_IIABOA="https://github.com/iiab/iiab-android"
+IIABOA_OPT_DIR="/opt/iiab-android"
+SITE_UPDATER="/opt/iiab-android/static/site/site-updater.sh"
 LOCAL_VARS_URL="https://raw.githubusercontent.com/iiab/iiab/refs/heads/master/vars/local_vars_android.yml"
 LOCAL_VARS_DEST="/etc/iiab/local_vars.yml"
 
@@ -197,6 +200,20 @@ tty_yesno_default_n() {
   [[ "${ans:-N}" =~ ^[Yy]$ ]]
 }
 
+install_update_repo() {
+local current_pwd="$(pwd)"
+  if [ ! -d "$IIABOA_OPT_DIR" ]; then
+    cd /opt/
+    git clone "$GIT_REPO_IIABOA"
+    cd $current_pwd
+  else
+    cd "$IIABOA_OPT_DIR"
+    git fetch origin main > /dev/null 2>&1 || true
+    git reset --hard origin/main > /dev/null 2>&1 || true
+    cd $current_pwd
+  fi
+}
+
 #-----------------------------
 # Update package db + deps
 #-----------------------------
@@ -205,6 +222,7 @@ apt-get install -y ca-certificates \
                    coreutils \
                    curl \
                    e2fsprogs \
+                   git \
                    iputils-ping \
                    netcat-traditional \
                    sudo
@@ -243,6 +261,9 @@ else
   validate_is_proot_or_die "$LOCAL_VARS_DEST" || { show_is_proot_lines "$LOCAL_VARS_DEST"; die "Android template local_vars.yml is invalid; cannot continue."; }
 fi
 
+# Pull repo and/or update it; thus static site data.
+install_update_repo
+
 #-----------------------------
 # Temporary workaround regarding roles on 32bits
 #-----------------------------
@@ -264,3 +285,9 @@ fi
 
 bash "$tmp_install" "$@"
 rm -f "$tmp_install"
+
+# Install landing page for static site.
+if [ -f "$SITE_UPDATER" ]; then
+  cd "${IIABOA_OPT_DIR}/static/site"
+  bash site-updater.sh
+fi

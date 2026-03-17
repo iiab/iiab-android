@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# GENERATED FILE: 2026-03-13T18:17:55-06:00 - do not edit directly.
+# GENERATED FILE: 2026-03-16T22:43:34-06:00 - do not edit directly.
 # Source modules: termux-setup/*.sh + manifest.sh
 # Rebuild: (cd termux-setup && bash build_bundle.sh)
 # -----------------------------------------------------------------------------
@@ -1154,6 +1154,7 @@ step_termux_base() {
     coreutils
     curl
     gawk
+    git
     grep
     jq
     openssh
