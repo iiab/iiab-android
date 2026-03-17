@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe Pocket Web</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="top-header">
+    <h1 class="header-title">Internet-in-a-Box on Android</h1>
+</header>
+
+<div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Loading...</div>
+</div>
+
+<div id="backend-status" class="status-banner hidden" data-i18n="backend_error" style="display: none; background-color: #ff4444; color: white; padding: 10px; text-align: center; width: 100%; position: absolute; top: 80px; z-index: 1000;">
+    ⚠️ The backend server is not responding. Please verify the services.
+</div>
+
+<div class="menu-container">
+    <a href="/books" class="btn btn-books"><span>📖</span> Books</a>
+    <a href="/kiwix" class="btn btn-kiwix"><img src="img/kiwix_logo.svg" class="app-logo"> Kiwix</a>
+    <a href="/kolibri" class="btn btn-kolibri"><img src="img/kolibri_logo.svg" class="app-logo"> Kolibri</a>
+    <a href="/maps" class="btn btn-maps"><span>🗺️</span> Maps</a>
+    <a href="/matomo" class="btn btn-matomo"><span>📊</span> Matomo</a>
+</div>
+
+<script src="js/app.js"></script>
+
+</body>
+</html>

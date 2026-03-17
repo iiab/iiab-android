@@ -1,0 +1,115 @@
+/* =========================================
+   Global Styles
+   ========================================= */
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #F4F7F6;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+/* =========================================
+   Header Styles
+   ========================================= */
+.top-header {
+    position: absolute;
+    top: 0; left: 0; width: 100%;
+    display: flex; align-items: center;
+    padding: 16px 20px;
+    box-sizing: border-box;
+    background-color: transparent;
+}
+
+.header-logo {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+}
+
+.header-title {
+    flex-grow: 1;
+    text-align: center;
+    margin: 0;
+    font-size: 22px;
+    font-weight: 900;
+    color: #2C3E50;
+    padding-right: 48px;
+}
+
+/* =========================================
+   Menu & Buttons
+   ========================================= */
+.menu-container {
+    width: 80%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-top: 60px;
+}
+
+.btn {
+    display: flex; align-items: center; justify-content: center;
+    padding: 18px; border-radius: 14px; text-decoration: none;
+    font-size: 20px; font-weight: bold;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.3s;
+}
+
+.btn:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* App colors */
+.btn-books   { background-color: #00BCD4; color: #FFFFFF; }
+.btn-kiwix   { background-color: #FF9800; color: #FFFFFF; }
+.btn-kolibri { background-color: #FFD54F; color: #4368f5; }
+.btn-maps    { background-color: #4CAF50; color: #FFFFFF; }
+.btn-matomo  { background-color: #1976D2; color: #FFFFFF; }
+
+.btn span { margin-right: 12px; font-size: 26px; }
+.btn .app-logo { width: 32px; height: 32px; margin-right: 12px; }
+
+/* Inactive status for buttons (grey) */
+.btn.disabled {
+    filter: grayscale(100%);
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    box-shadow: none;
+    transform: none;
+}
+
+/* =========================================
+   UI Overlays (Spinner & Banners)
+   ========================================= */
+#loadingOverlay {
+    display: none;
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(244, 247, 246, 0.85);
+    z-index: 9999;
+    flex-direction: column; justify-content: center; align-items: center;
+}
+
+.spinner {
+    width: 50px; height: 50px;
+    border: 6px solid #E0E0E0;
+    border-top: 6px solid #1976D2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    margin-top: 15px; font-size: 18px; font-weight: bold; color: #333;
+}
