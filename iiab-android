@@ -9,13 +9,21 @@
 
 set -euo pipefail
 
+RED="\033[31m"; YEL="\033[33m"; GRN="\033[32m"; BLU="\033[34m"; RST="\033[0m"; BOLD="\033[1m"
+
+#-----------------------------
+# Minimal helpers
+#-----------------------------
+ok()   { printf "${GRN}[iiab]${RST} %s\n" "$*"; }
+log()  { printf "${BLU}[iiab]${RST} %s\n" "$*"; }
+warn() { printf "${YEL}[iiab] WARNING:${RST} %s\n" "$*" >&2; }
+die()  { printf "${RED}[!] ERROR${RST}: %s\n" "$*" >&2; exit 1; }
+
 #-----------------------------
 # Safety checks
 #-----------------------------
 if [ "$(id -u)" != "0" ]; then
-    echo "This script should be run as root, which is the default in proot-distro"
-    echo "Careful, maybe this script is not been executed on the right terminal?"
-    exit 1
+    die "This script should be run as root (default in proot-distro). Wrong terminal?"
 fi
 
 #-----------------------------
@@ -35,12 +43,6 @@ ENABLE_DEMO_CONTENTS="${ENABLE_DEMO_CONTENTS:-1}"
 DEMO_REPO_URL="https://iiab.switnet.org/android/static_demo/"
 
 CURL="curl -fsSL --retry 5 --retry-connrefused --retry-delay 2"
-#-----------------------------
-# Minimal helpers
-#-----------------------------
-log()  { printf "[iiab] %s\n" "$*"; }
-warn() { printf "[iiab] WARNING: %s\n" "$*" >&2; }
-die()  { printf "[iiab] ERROR: %s\n" "$*" >&2; exit 1; }
 
 #-----------------------------
 # local_vars.yml validation (is_proot)
@@ -72,7 +74,7 @@ validate_is_proot_or_die() {
   # b) exactly one entry
   if [[ "${count:-0}" -eq 1 ]]; then
     if [[ "$has_true" -eq 1 ]]; then
-      log "local_vars.yml: is_proot: True (OK)."
+      ok "local_vars.yml: is_proot: True (OK)."
       return 0
     fi
     die "local_vars.yml: is_proot must be True (False will break this install)."
@@ -104,11 +106,11 @@ apt3_enable_sources() {
   local apt_ver
   apt_ver="$(apt -v 2>/dev/null | awk '{print $2}' | cut -d. -f1-2)"
   if [ -z "$apt_ver" ]; then
-    echo "ERROR: couldn't detect apt version" >&2
+    warn "couldn't detect apt version" >&2
     return 1
   fi
   if ! dpkg --compare-versions "$apt_ver" ge "3.0"; then
-    echo "ERROR: apt >= 3.0 required (found $apt_ver)" >&2
+    warn "apt >= 3.0 required (found $apt_ver)" >&2
     return 1
   fi
 
@@ -121,7 +123,7 @@ apt3_enable_sources() {
     distro="${ID:-}"
   fi
   if [ -z "$distro" ]; then
-    echo "ERROR: couldn't determine ID from /etc/os-release" >&2
+    warn "couldn't determine ID from /etc/os-release" >&2
     return 1
   fi
 
@@ -134,7 +136,7 @@ apt3_enable_sources() {
   fi
 
   if [ ! -f "$f" ]; then
-    echo "ERROR: expected sources file not found: $f" >&2
+    warn "expected sources file not found: $f" >&2
     return 1
   fi
 
@@ -155,7 +157,7 @@ apt3_enable_sources() {
 }
 
 enable_custom_iiab_pip() {
-  echo "Add extra wheels pip repo."
+  log "Add extra wheels pip repo."
   cat << EOF > /etc/pip.conf
 [global]
 extra-index-url=https://iiab.switnet.org/simple
@@ -245,10 +247,13 @@ install_demo_contents() {
     mkdir -p "$zim_dir"
 
     local zims=(
+      "wikipedia_ar_top_mini_2026-01.zim"
       "wikipedia_en_top_mini_2026-03.zim"
       "wikipedia_es_top_mini_2026-01.zim"
       "wikipedia_fr_top_mini_2026-01.zim"
       "wikipedia_hi_top_mini_2025-10.zim"
+      "wikipedia_pt_top_mini_2026-01.zim"
+      "wikipedia_sw_all_nopic_2026-01.zim"
       "wikipedia_zh_top_mini_2026-03.zim"
     )
 
@@ -284,7 +289,7 @@ install_demo_contents() {
     log "Skipping Calibre-Web demo content (calibreweb_install is not True)."
   fi
 
-  log "Demo content processing finished!"
+  ok "Demo content processing finished!"
 }
 
 #-----------------------------
@@ -349,11 +354,11 @@ disable_role_32bits kiwix "$LOCAL_VARS_DEST"
 tmp_install="$(mktemp)"
 
 if $CURL "$INSTALL_PRIMARY" -o "$tmp_install"; then
-  :
+  ok "Primary installer fetched successfully."
 else
-  echo "Warning: failed to fetch $INSTALL_PRIMARY"
-  echo "Falling back to $INSTALL_FALLBACK"
-  $CURL "$INSTALL_FALLBACK" -o "$tmp_install"
+  warn "failed to fetch $INSTALL_PRIMARY"
+  log "Falling back to $INSTALL_FALLBACK"
+  $CURL "$INSTALL_FALLBACK" -o "$tmp_install" || die "Failed to fetch fallback installer too."
 fi
 
 bash "$tmp_install" "$@"
@@ -363,10 +368,6 @@ rm -f "$tmp_install"
 # Optional Modules (Controlled via env vars)
 #-----------------------------
 # Install landing page for static site.
-if [ -f "$SITE_UPDATER" ]; then
-  cd "${IIABOA_OPT_DIR}/static/site"
-  bash site-updater.sh
-fi
 if [ "$ENABLE_INDEX_PAGE" -eq 1 ]; then
   if [ -f "$SITE_UPDATER" ]; then
     log "Running site-updater..."
@@ -377,4 +378,10 @@ if [ "$ENABLE_INDEX_PAGE" -eq 1 ]; then
   fi
 else
   log "Skipping website installation (ENABLE_INDEX_PAGE=0)."
+fi
+# Install demo content
+if [ "$ENABLE_DEMO_CONTENTS" -eq 1 ]; then
+  install_demo_contents
+else
+  log "Skipping the demo content installation (ENABLE_DEMO_CONTENTS=0)."
 fi
