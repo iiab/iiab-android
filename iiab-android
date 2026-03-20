@@ -183,6 +183,21 @@ disable_role_32bits() {
   fi
 }
 
+is_role_enabled() {
+  local role="$1"
+  local file="${2:-$LOCAL_VARS_DEST}"
+
+  if [ ! -f "$file" ]; then
+    return 1
+  fi
+
+  if grep -iqE "^[[:space:]]*${role}_install[[:space:]]*:[[:space:]]*True" "$file"; then
+    return 0
+  fi
+
+  return 1
+}
+
 fetch_android_local_vars() {
   # args: destination
   local dest="$1"
@@ -223,38 +238,53 @@ local current_pwd="$(pwd)"
 install_demo_contents() {
   log "Installing demo content..."
 
-  # Prepare and download ZIM files
-  local zim_dir="/library/zims/content"
-  mkdir -p "$zim_dir"
+  # --- ROLE: KIWIX ---
+  if is_role_enabled "kiwix"; then
+    log "Kiwix module is enabled. Downloading ZIM demo files..."
+    local zim_dir="/library/zims/content"
+    mkdir -p "$zim_dir"
 
-  local zims=(
-    "wikipedia_en_top_mini_2026-03.zim"
-    "wikipedia_es_top_mini_2026-01.zim"
-    "wikipedia_fr_top_mini_2026-01.zim"
-    "wikipedia_hi_top_mini_2025-10.zim"
-    "wikipedia_zh_top_mini_2026-03.zim"
-  )
+    local zims=(
+      "wikipedia_en_top_mini_2026-03.zim"
+      "wikipedia_es_top_mini_2026-01.zim"
+      "wikipedia_fr_top_mini_2026-01.zim"
+      "wikipedia_hi_top_mini_2025-10.zim"
+      "wikipedia_zh_top_mini_2026-03.zim"
+    )
 
-  log "Downloading ${#zims[@]} ZIM demo diles at $zim_dir..."
-  for zim in "${zims[@]}"; do
-    wget -c "${DEMO_REPO_URL}/${zim}" -P "$zim_dir" || warn "Failed downloading $zim"
-  done
+    for zim in "${zims[@]}"; do
+      wget -c "${DEMO_REPO_URL}/${zim}" -P "$zim_dir" || warn "Failed downloading $zim"
+    done
 
-  # Prepare and download Calibre-Web demo library
-  local cw_dir="/library/calibre-web"
-  local cw_tar="cw-demo-library.tar.gz"
-  mkdir -p "$cw_dir"
-
-  log "Downloading and installing the demo library for Calibre-Web..."
-  if wget -c "${DEMO_REPO_URL}/${cw_tar}" -O "/tmp/${cw_tar}"; then
-    log "Extracting $cw_tar into $cw_dir..."
-    tar -xzf "/tmp/${cw_tar}" -C "$cw_dir"
-    rm -f "/tmp/${cw_tar}"
+    # Make sure iiab-make-kiwix-lib exist, skip and logs if not
+    if command -v iiab-make-kiwix-lib >/dev/null 2>&1; then
+      iiab-make-kiwix-lib
+    else
+      warn "iiab-make-kiwix-lib not found, skipping library generation."
+    fi
   else
-    warn "Failed to download Calibre-Web demo library ($cw_tar)"
+    log "Skipping Kiwix demo content (kiwix_install is not True)."
   fi
 
-  log "Demo content processed!"
+  # --- ROLE: CALIBRE-WEB ---
+  if is_role_enabled "calibreweb"; then
+    log "Calibre-Web module is enabled. Downloading and installing demo library..."
+    local cw_dir="/library/calibre-web"
+    local cw_tar="cw-demo-library.tar.gz"
+    mkdir -p "$cw_dir"
+
+    if wget -c "${DEMO_REPO_URL}/${cw_tar}" -O "/tmp/${cw_tar}"; then
+      log "Extracting $cw_tar into $cw_dir..."
+      tar -xzf "/tmp/${cw_tar}" -C "$cw_dir"
+      rm -f "/tmp/${cw_tar}"
+    else
+      warn "Failed to download Calibre-Web demo library ($cw_tar)"
+    fi
+  else
+    log "Skipping Calibre-Web demo content (calibreweb_install is not True)."
+  fi
+
+  log "Demo content processing finished!"
 }
 
 #-----------------------------
@@ -347,11 +377,4 @@ if [ "$ENABLE_INDEX_PAGE" -eq 1 ]; then
   fi
 else
   log "Skipping website installation (ENABLE_INDEX_PAGE=0)."
-fi
-
-# Install demo content
-if [ "$ENABLE_DEMO_CONTENTS" -eq 1 ]; then
-  install_demo_contents
-else
-  log "Skipping the demo content installation (ENABLE_DEMO_CONTENTS=0)."
 fi
