@@ -30,8 +30,11 @@ LOCAL_VARS_DEST="/etc/iiab/local_vars.yml"
 INSTALL_PRIMARY="https://iiab.io/install.txt"
 INSTALL_FALLBACK="https://raw.githubusercontent.com/iiab/iiab-factory/refs/heads/master/install.txt"
 
-CURL="curl -fsSL --retry 5 --retry-connrefused --retry-delay 2"
+ENABLE_INDEX_PAGE="${ENABLE_INDEX_PAGE:-1}"
+ENABLE_DEMO_CONTENTS="${ENABLE_DEMO_CONTENTS:-1}"
+DEMO_REPO_URL="https://iiab.switnet.org/android/static_demo/"
 
+CURL="curl -fsSL --retry 5 --retry-connrefused --retry-delay 2"
 #-----------------------------
 # Minimal helpers
 #-----------------------------
@@ -215,6 +218,46 @@ local current_pwd="$(pwd)"
 }
 
 #-----------------------------
+# Demo Contents Installer
+#-----------------------------
+install_demo_contents() {
+  log "Installing demo content..."
+
+  # Prepare and download ZIM files
+  local zim_dir="/library/zims/content"
+  mkdir -p "$zim_dir"
+
+  local zims=(
+    "wikipedia_en_top_mini_2026-03.zim"
+    "wikipedia_es_top_mini_2026-01.zim"
+    "wikipedia_fr_top_mini_2026-01.zim"
+    "wikipedia_hi_top_mini_2025-10.zim"
+    "wikipedia_zh_top_mini_2026-03.zim"
+  )
+
+  log "Downloading ${#zims[@]} ZIM demo diles at $zim_dir..."
+  for zim in "${zims[@]}"; do
+    wget -c "${DEMO_REPO_URL}/${zim}" -P "$zim_dir" || warn "Failed downloading $zim"
+  done
+
+  # Prepare and download Calibre-Web demo library
+  local cw_dir="/library/calibre-web"
+  local cw_tar="cw-demo-library.tar.gz"
+  mkdir -p "$cw_dir"
+
+  log "Downloading and installing the demo library for Calibre-Web..."
+  if wget -c "${DEMO_REPO_URL}/${cw_tar}" -O "/tmp/${cw_tar}"; then
+    log "Extracting $cw_tar into $cw_dir..."
+    tar -xzf "/tmp/${cw_tar}" -C "$cw_dir"
+    rm -f "/tmp/${cw_tar}"
+  else
+    warn "Failed to download Calibre-Web demo library ($cw_tar)"
+  fi
+
+  log "Demo content processed!"
+}
+
+#-----------------------------
 # Update package db + deps
 #-----------------------------
 apt-get update
@@ -286,8 +329,29 @@ fi
 bash "$tmp_install" "$@"
 rm -f "$tmp_install"
 
+#-----------------------------
+# Optional Modules (Controlled via env vars)
+#-----------------------------
 # Install landing page for static site.
 if [ -f "$SITE_UPDATER" ]; then
   cd "${IIABOA_OPT_DIR}/static/site"
   bash site-updater.sh
+fi
+if [ "$ENABLE_INDEX_PAGE" -eq 1 ]; then
+  if [ -f "$SITE_UPDATER" ]; then
+    log "Running site-updater..."
+    cd "${IIABOA_OPT_DIR}/static/site"
+    bash site-updater.sh
+  else
+    warn "site-updater.sh not found at $SITE_UPDATER"
+  fi
+else
+  log "Skipping website installation (ENABLE_INDEX_PAGE=0)."
+fi
+
+# Install demo content
+if [ "$ENABLE_DEMO_CONTENTS" -eq 1 ]; then
+  install_demo_contents
+else
+  log "Skipping the demo content installation (ENABLE_DEMO_CONTENTS=0)."
 fi
