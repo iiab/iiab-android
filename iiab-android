@@ -242,7 +242,7 @@ install_demo_contents() {
 
   # --- ROLE: KIWIX ---
   if is_role_enabled "kiwix"; then
-    log "Kiwix module is enabled. Downloading ZIM demo files..."
+    log "Kiwix role is enabled. Downloading ZIM demo files..."
     local zim_dir="/library/zims/content"
     mkdir -p "$zim_dir"
 
@@ -273,7 +273,7 @@ install_demo_contents() {
 
   # --- ROLE: CALIBRE-WEB ---
   if is_role_enabled "calibreweb"; then
-    log "Calibre-Web module is enabled. Downloading and installing demo library..."
+    log "Calibre-Web role is enabled. Downloading and installing demo library..."
     local cw_dir="/library/calibre-web"
     local cw_tar="cw-demo-library.tar.gz"
     mkdir -p "$cw_dir"
@@ -365,7 +365,7 @@ bash "$tmp_install" "$@"
 rm -f "$tmp_install"
 
 #-----------------------------
-# Optional Modules (Controlled via env vars)
+# Optional changes (controlled via env vars)
 #-----------------------------
 # Install landing page for static site.
 if [ "$ENABLE_INDEX_PAGE" -eq 1 ]; then
@@ -377,7 +377,7 @@ if [ "$ENABLE_INDEX_PAGE" -eq 1 ]; then
     warn "site-updater.sh not found at $SITE_UPDATER"
   fi
 else
-  log "Skipping website installation (ENABLE_INDEX_PAGE=0)."
+  log "Skipping index site installation (ENABLE_INDEX_PAGE=0)."
 fi
 # Install demo content
 if [ "$ENABLE_DEMO_CONTENTS" -eq 1 ]; then
