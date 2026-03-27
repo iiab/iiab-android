@@ -1,5 +1,6 @@
 import { Socket } from 'socket.io';
 import { spawn, ChildProcess } from 'child_process';
+import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -64,14 +65,65 @@ export const handleKiwixEvents = (socket: Socket) => {
         socket.emit('kiwix_tools_status', { hasAria2, hasIndexer });
     });
 
-    socket.on('start_kiwix_download', (zims: string[]) => {
+    socket.on('start_kiwix_download', async (zims: string[]) => {
         if (downloadProcess || indexProcess) {
             socket.emit('kiwix_terminal_output', '\n[System] A process is already running.\n');
             return;
         }
         if (zims.length === 0) return;
-        
-        currentDownloads = zims; // Save what we are downloading
+
+        // Add download protection
+        try {
+            socket.emit('kiwix_terminal_output', `\n[System] 🔍 Running storage Pre-flight Check...\n`);
+
+            // Get disk free space
+            const dfOutput = execSync('df -k /').toString().trim().split('\n');
+            const dataLine = dfOutput[dfOutput.length - 1];
+            const availableKB = parseInt(dataLine.split(/\s+/)[3], 10);
+            const freeSpaceBytes = availableKB * 1024;
+
+            // Set safety buffer size (5 GB)
+            const SAFETY_BUFFER_BYTES = 5 * 1024 * 1024 * 1024;
+
+            // Check required size to donwload
+            let totalRequiredBytes = 0;
+            const catalog = await getKiwixCatalog();
+
+            zims.forEach(id => {
+                const zim = catalog.find((z: any) => z.id === id);
+                if (zim && zim.size) {
+                    const sizeMatch = zim.size.match(/([\d.]+)\s*(G|M|K)B/i);
+                    if (sizeMatch) {
+                        const val = parseFloat(sizeMatch[1]);
+                        const unit = sizeMatch[2].toUpperCase();
+                        if (unit === 'G') totalRequiredBytes += val * 1024 * 1024 * 1024;
+                        if (unit === 'M') totalRequiredBytes += val * 1024 * 1024;
+                        if (unit === 'K') totalRequiredBytes += val * 1024;
+                    }
+                }
+            });
+
+            // Apply safety measures.
+            if ((freeSpaceBytes - totalRequiredBytes) < SAFETY_BUFFER_BYTES) {
+                const requiredGB = (totalRequiredBytes / (1024**3)).toFixed(1);
+                const freeGB = (freeSpaceBytes / (1024**3)).toFixed(1);
+
+                socket.emit('kiwix_terminal_output', `\n❌ [ERROR] ❌\n`);
+                socket.emit('kiwix_terminal_output', `Attempting to download ~${requiredGB} GB, but only ${freeGB} GB are free.\n`);
+                socket.emit('kiwix_terminal_output', `Please free more space before trying to download more content.\n`);
+
+                socket.emit('kiwix_process_status', { isRunning: false });
+                return;
+            }
+
+            socket.emit('kiwix_terminal_output', `[System] ✅ Storage verified. Safety buffer intact.\n`);
+        } catch (err) {
+            console.error('[System] Could not verify disk space', err);
+            socket.emit('kiwix_terminal_output', `[Warning] Could not verify free space with OS. Proceeding with caution...\n`);
+        }
+        // =========================================================
+
+        currentDownloads = zims;
         const baseUrl = 'https://download.kiwix.org/zim/wikipedia/';
         const urls = zims.map(zim => baseUrl + zim);
         
@@ -83,11 +135,11 @@ export const handleKiwixEvents = (socket: Socket) => {
         
         downloadProcess.stdout?.on('data', (data) => socket.emit('kiwix_terminal_output', data.toString()));
         downloadProcess.stderr?.on('data', (data) => socket.emit('kiwix_terminal_output', data.toString()));
-        
+
         // Handle natural process exit
         downloadProcess.on('exit', (code, signal) => {
             downloadProcess = null;
-            
+
             // If killed manually (Cancellation), ignore this block
             if (signal === 'SIGKILL') return;
             
@@ -133,22 +185,24 @@ export const handleKiwixEvents = (socket: Socket) => {
     socket.on('cancel_kiwix_download', () => {
         if (downloadProcess) {
             socket.emit('kiwix_terminal_output', '\n[System] 🛑 ABORTING: Killing Aria2c process...\n');
-            
             // 1. Kill the process (Ctrl+C equivalent)
             downloadProcess.kill('SIGKILL');
             downloadProcess = null;
-            
             // 2. Sweep the trash (Incomplete files)
             socket.emit('kiwix_terminal_output', '[System] 🧹 Cleaning temporary and incomplete files...\n');
             currentDownloads.forEach(zim => {
                 const filePath = path.join(ZIMS_DIR, zim);
                 const ariaPath = filePath + '.aria2';
+                const meta4Path = filePath + '.meta4';
+                const torrentPath = filePath + '.torrent';
                 
-                if (fs.existsSync(filePath)) fs.unlinkSync(filePath); // Delete the .zim
-                if (fs.existsSync(ariaPath)) fs.unlinkSync(ariaPath); // Delete the .aria2 map
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                if (fs.existsSync(ariaPath)) fs.unlinkSync(ariaPath);
+                if (fs.existsSync(meta4Path)) fs.unlinkSync(meta4Path);
+                if (fs.existsSync(torrentPath)) fs.unlinkSync(torrentPath);
             });
             
-            currentDownloads = []; // Clear memory
+            currentDownloads = [];
             
             socket.emit('kiwix_terminal_output', '[System] ✔️ Cancellation complete. System ready.\n');
             socket.emit('kiwix_process_status', { isRunning: false });
