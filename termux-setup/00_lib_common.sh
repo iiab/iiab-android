@@ -14,7 +14,7 @@ indent()    { sed 's/^/ /'; }
 
 have() { command -v "$1" >/dev/null 2>&1; }
 need() { have "$1" || return 1; }
-die()  { echo "[!] $*" >&2; exit 1; }
+die()  { printf "${RED}[!] ERROR${RST}: %s\n" "$*" >&2; exit 1; }
 
 blank() {
   local n="${1:-1}" fd=1
@@ -280,6 +280,17 @@ iiab_login() {
   fi
 
   ok "Starting IIAB Debian (via: iiab-termux --start)"
+  local wlan_ip; wlan_ip="$(adb_local_ipv4s_csv 2>/dev/null | cut -d, -f1)"
+  if [[ -n "$wlan_ip" && "$wlan_ip" != "Disconnected" && "$wlan_ip" != "0.0.0.0" ]]; then
+    blank
+    log "To use your IIAB on Android over the network, please scan the following QR Code:"
+    qrencode -t UTF8 "http://${wlan_ip}:8085/"
+    blank
+  else
+    blank
+    warn "It seems there is no network available to share IIAB on Android over the network."
+    blank
+  fi
   power_mode_login_enter || true
 
   # Auto-start boxyproxy for the duration of this proot session.

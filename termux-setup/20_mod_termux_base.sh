@@ -504,10 +504,12 @@ step_termux_base() {
     git
     grep
     jq
+    libqrencode
     openssh
     proot
     proot-distro
     python
+    rsync
     sed
     termux-api
     which
