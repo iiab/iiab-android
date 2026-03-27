@@ -293,6 +293,59 @@ install_demo_contents() {
 }
 
 #-----------------------------
+# Install IIAB-oA Dashboard
+#-----------------------------
+enable_nodejs_vars() {
+  local file="${1:-$LOCAL_VARS_DEST}"
+
+  if is_role_enabled "nodejs" "$file"; then
+    log "Node.js is already enabled in $file. Skipping."
+    return 0
+  fi
+
+  log "Ensuring Node.js is enabled in $file..."
+
+  for var in nodejs_install nodejs_enabled; do
+    if grep -qE "^[[:space:]]*${var}[[:space:]]*:" "$file"; then
+      sed -i -E "s|^[[:space:]]*(${var}[[:space:]]*:).*|\1 True|" "$file"
+    else
+      echo "${var}: True" >> "$file"
+    fi
+  done
+  ok "Node.js flagged for installation."
+}
+
+install_iiaboa_dashboard() {
+  log "Installing IIAB-oA Dashboard..."
+  local dash_src="${IIABOA_OPT_DIR}/static/dashboard"
+  local dash_dest="/library/dashboard"
+
+  # Copy dashboard files
+  mkdir -p "$dash_dest"
+  rsync -Aax "${dash_src}/" "$dash_dest/"
+
+  # Install node dependencies
+  log "Running npm install for the dashboard..."
+  (cd "$dash_dest" && npm install)
+
+  # Setup pdsm service
+  log "Configuring dash-node PDSM service..."
+  cp "${dash_src}/pdsm/dash-node" "/usr/local/pdsm/services-available/dash-node"
+  chmod +x "/usr/local/pdsm/services-available/dash-node"
+  /usr/local/bin/pdsm enable dash-node
+  /usr/local/bin/pdsm restart dash-node
+
+  # Setup nginx
+  log "Configuring Nginx for the dashboard..."
+  cp "${dash_src}/dash-node-nginx.conf" "/etc/nginx/conf.d/dash-node-nginx.conf"
+
+  log "Restarting Nginx..."
+  /usr/local/bin/pdsm restart nginx
+
+  ok "IIAB-oA Dashboard installed and running!"
+}
+
+#-----------------------------
 # Update package db + deps
 #-----------------------------
 apt-get update
@@ -339,6 +392,8 @@ else
   validate_is_proot_or_die "$LOCAL_VARS_DEST" || { show_is_proot_lines "$LOCAL_VARS_DEST"; die "Android template local_vars.yml is invalid; cannot continue."; }
 fi
 
+enable_nodejs_vars "$LOCAL_VARS_DEST"
+
 # Pull repo and/or update it; thus static site data.
 install_update_repo
 
@@ -379,9 +434,13 @@ if [ "$ENABLE_INDEX_PAGE" -eq 1 ]; then
 else
   log "Skipping index site installation (ENABLE_INDEX_PAGE=0)."
 fi
+
 # Install demo content
 if [ "$ENABLE_DEMO_CONTENTS" -eq 1 ]; then
   install_demo_contents
 else
   log "Skipping the demo content installation (ENABLE_DEMO_CONTENTS=0)."
 fi
+
+# Install dashboard
+install_iiaboa_dashboard

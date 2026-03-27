@@ -1,0 +1,84 @@
+#!/bin/sh
+# /usr/local/pdsm/services-available/dash-node
+# Simple PDSM service wrapper for IIAB-oA Dashboard (Node.js)
+
+PDSM_COMMON="/usr/local/pdsm/lib/pdsm-common.sh"
+[ -r "$PDSM_COMMON" ] && . "$PDSM_COMMON"
+
+SERVICE_NAME="dash-node"
+
+APP_DIR="/library/dashboard"
+APP_CMD="npx ts-node server.ts"
+
+PIDFILE="/run/dash-node.pid"
+LOGFILE="/var/log/dash-node.log"
+
+running() {
+  [ -s "$PIDFILE" ] || return 1
+  pid="$(cat "$PIDFILE" 2>/dev/null || echo '')"
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+start() {
+  if running; then
+    echo "[pdsm:$SERVICE_NAME] already running"
+    return 0
+  fi
+
+  echo "[pdsm:$SERVICE_NAME] starting..."
+  cd "$APP_DIR" || return 1
+  nohup $APP_CMD > "$LOGFILE" 2>&1 &
+  echo $! > "$PIDFILE"
+
+  for i in $(seq 1 "${PDSM_START_TIMEOUT:-5}"); do
+    if running; then
+      echo "[pdsm:$SERVICE_NAME] started"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "[pdsm:$SERVICE_NAME] failed to start" >&2
+  return 1
+}
+
+stop() {
+  if ! running; then
+    echo "[pdsm:$SERVICE_NAME] already stopped"
+    return 0
+  fi
+
+  echo "[pdsm:$SERVICE_NAME] stopping..."
+  pid="$(cat "$PIDFILE")"
+  kill "$pid" 2>/dev/null || true
+
+  for i in $(seq 1 "${PDSM_START_TIMEOUT:-5}"); do
+    if ! running; then
+      rm -f "$PIDFILE"
+      echo "[pdsm:$SERVICE_NAME] stopped"
+      return 0
+    fi
+    sleep 1
+  done
+
+  kill -9 "$pid" 2>/dev/null || true
+  rm -f "$PIDFILE"
+  echo "[pdsm:$SERVICE_NAME] forced stop"
+  return 1
+}
+
+status() {
+  if running; then
+    echo "[pdsm:$SERVICE_NAME] running (PID: $(cat $PIDFILE))"
+    return 0
+  fi
+  echo "[pdsm:$SERVICE_NAME] not running"
+  return 3
+}
+
+case "$1" in
+  start|stop|status) "$1" ;;
+  restart) stop; start ;;
+  *) echo "Usage: $0 {start|stop|restart|status}" >&2; exit 1 ;;
+esac

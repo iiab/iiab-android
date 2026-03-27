@@ -1,0 +1,174 @@
+<div id="panel-maps" class="app-panel hidden-section pb-5">
+    <h2 class="mb-4 text-light fw-bold border-bottom border-secondary pb-3">Map Extraction Dashboard</h2>
+    
+    <div class="card bg-dark text-light mb-4 p-3 border-secondary shadow-sm">
+        <label for="raw-command" class="form-label text-warning fw-bold">Execute "New Maps" shell command:</label>
+        <div class="row g-2 align-items-stretch">
+            <div class="col-12 col-md-10">
+                <textarea id="raw-command" class="form-control bg-secondary text-light border-0 h-100" rows="2" style="resize: none;" placeholder="e.g.: sudo /opt/iiab/maps/..."></textarea>
+            </div>
+            <div class="col-12 col-md-2">
+                <button id="btn-start" class="btn btn-primary w-100 h-100 fw-bold">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="maps-terminal-container" class="position-relative mb-4">
+        <div id="terminal" style="background-color: #000; color: #0f0; height: 250px; overflow-y: auto; padding: 10px; font-family: monospace; border-radius: 5px; white-space: pre-wrap; margin-bottom: 15px;">Waiting for commands...</div>
+
+        <div class="collapse-btn-container d-flex justify-content-center">
+            <button id="btn-toggle-maps-terminal" class="btn btn-sm btn-dark border-secondary text-secondary" style="border-radius: 20px; padding: 2px 15px;">▲ Hide Terminal</button>
+        </div>
+    </div>
+
+    <div id="controls-yn" class="card bg-dark border-warning p-3 hidden-section shadow mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="text-warning fw-bold">⚠️ The system requires your confirmation to continue:</span>
+            <div>
+                <button id="btn-yes" class="btn btn-success me-2 px-4">Yes</button>
+                <button id="btn-no" class="btn btn-danger px-4">No</button>
+            </div>
+        </div>
+    </div>
+
+    <hr class="border-secondary mb-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="text-primary mb-0">🗺️ Existing Regions on Maps Server</h4>
+        <button id="btn-refresh-maps" class="btn btn-sm btn-outline-primary">🔄 Refresh List</button>
+    </div>
+    
+    <div id="maps-status" class="alert alert-info d-flex align-items-center">
+        <span class="spinner-border spinner-border-sm me-3" role="status" aria-hidden="true"></span>
+        <span>Loading server catalog...</span>
+    </div>
+
+    <div class="row g-3" id="maps-container">
+        </div>
+</div>
+
+<script>
+    const terminal = document.getElementById('terminal');
+    const btnStart = document.getElementById('btn-start');
+    const rawCommandInput = document.getElementById('raw-command');
+    const controlsYN = document.getElementById('controls-yn');
+
+// Logic for Hiding/Showing Map Terminal
+    let mapsTerminalVisible = true;
+    const btnToggleMapsTerminal = document.getElementById('btn-toggle-maps-terminal');
+
+    btnToggleMapsTerminal.addEventListener('click', (e) => {
+        if(mapsTerminalVisible) {
+            terminal.style.display = 'none';
+            e.target.textContent = '▼ Show Terminal';
+        } else {
+            terminal.style.display = 'block';
+            e.target.textContent = '▲ Hide Terminal';
+        }
+        mapsTerminalVisible = !mapsTerminalVisible;
+    });
+
+    // Extra function to force the display of errors or new processes
+    function forceShowMapsTerminal() {
+        terminal.style.display = 'block';
+        btnToggleMapsTerminal.textContent = '▲ Hide Terminal';
+        mapsTerminalVisible = true;
+    }
+
+    function printToTerminal(text) {
+        terminal.textContent += text;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    // A. Copy-Paste Logic (Old UI)
+    btnStart.addEventListener('click', () => socket.emit('start_command', { rawCommand: rawCommandInput.value }));
+
+    socket.on('terminal_output', (data) => {
+        printToTerminal(data);
+        if (/y\/n/i.test(data)) controlsYN.classList.remove('hidden-section');
+    });
+
+    function sendYN(response) { 
+        socket.emit('send_input', response); 
+        controlsYN.classList.add('hidden-section');
+    }
+    
+    document.getElementById('btn-yes').addEventListener('click', () => sendYN('y'));
+    document.getElementById('btn-no').addEventListener('click', () => sendYN('n'));
+
+    // B. Card Catalog Logic
+    let mapsInMemory = [];
+    const mapsContainer = document.getElementById('maps-container');
+    const mapsStatus = document.getElementById('maps-status');
+
+    // Request data on app load and refresh button
+    function requestUpdate() {
+        mapsStatus.classList.remove('hidden-section');
+        socket.emit('request_maps_catalog');
+    }
+
+    requestUpdate();
+    document.getElementById('btn-refresh-maps').addEventListener('click', requestUpdate);
+
+    // Receive catalog from Node
+    socket.on('maps_catalog_ready', (catalog) => {
+        mapsInMemory = catalog;
+        mapsStatus.classList.add('hidden-section');
+        renderMapsGrid();
+    });
+
+    // Draw cards
+    function renderMapsGrid() {
+        mapsContainer.innerHTML = '';
+        if (mapsInMemory.length === 0) {
+            mapsContainer.innerHTML = `<div class="col-12"><div class="alert bg-dark text-secondary text-center border-secondary">No map regions registered in extracts.json.</div></div>`;
+            return;
+        }
+
+        mapsInMemory.forEach(map => {
+            const card = `
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="card map-card p-3 h-100 shadow-sm d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="fw-bold fs-5 mb-1">${map.name}</div>
+                            <div class="map-coords text-break">[ ${map.bbox} ]</div>
+                        </div>
+                        <div class="text-end mt-3">
+                            <button id="btn-del-map-${map.name}" class="btn btn-sm btn-outline-danger" onclick="deleteRegionDirectly(event, '${map.name}')">🗑️ Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            mapsContainer.innerHTML += card;
+        });
+    }
+
+    // C. Direct Deletion Logic
+    function deleteRegionDirectly(event, regionName) {
+        event.stopPropagation();
+        if(confirm(`⚠️ Do you want to delete the region "${regionName}" from the server?\n`)){
+            const btnDel = document.getElementById(`btn-del-map-${regionName}`);
+            btnDel.textContent = "⏳ Deleting...";
+            btnDel.disabled = true;
+            btnDel.classList.replace('btn-outline-danger', 'btn-secondary');
+            
+            terminal.classList.remove('hidden-section');
+            socket.emit('delete_map_region', regionName);
+        }
+    }
+
+    // General UI Control
+    socket.on('process_status', (status) => {
+        btnStart.disabled = status.isRunning;
+        rawCommandInput.disabled = status.isRunning;
+        
+        if (status.isRunning) { 
+            btnStart.textContent = "Executing..."; 
+            btnStart.classList.replace('btn-primary', 'btn-secondary');
+        } else { 
+            btnStart.textContent = "Start"; 
+            btnStart.classList.replace('btn-secondary', 'btn-primary'); 
+            controlsYN.classList.add('hidden-section');
+        }
+    });
+</script>

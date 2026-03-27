@@ -1,0 +1,121 @@
+/* =========================================
+   BASE STYLES
+   ========================================= */
+body { 
+    background-color: #121212; 
+    color: #ffffff; 
+    overflow-x: hidden; 
+}
+.hidden-section { 
+    display: none !important; 
+}
+
+/* =========================================
+   RESPONSIVE NAVIGATION (SIDEBAR / BOTTOM NAV)
+   ========================================= */
+.nav-btn { cursor: pointer; border-radius: 8px; transition: background 0.2s; }
+.nav-btn:hover, .nav-btn.active { background-color: rgba(255,255,255,0.1); }
+.nav-icon { display: inline-block; margin-right: 10px; }
+
+/* Desktop (PC) */
+@media (min-width: 768px) {
+    .app-sidebar {
+        min-height: 100vh;
+        background-color: #1e1e1e;
+        border-right: 1px solid #333;
+    }
+}
+
+/* Mobile (Phone) */
+@media (max-width: 767.98px) {
+    .app-sidebar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        z-index: 1050; 
+        background-color: #121212 !important;
+        border-top: 1px solid #333;
+        padding: 10px 0 !important;
+    }
+    .sidebar-title { display: none; } 
+    .app-sidebar .nav {
+        flex-direction: row !important; 
+        justify-content: space-evenly;
+    }
+    .nav-btn {
+        display: flex;
+        flex-direction: column; 
+        align-items: center;
+        padding: 5px;
+        font-size: 0.75rem; 
+    }
+    .nav-icon { margin-right: 0; margin-bottom: 2px; }
+    
+    body { padding-bottom: 80px; } /* Prevents the menu from overlapping the content */
+    .col-md-9 { padding: 15px !important; } /* Less lateral padding on mobile */
+}
+
+/* =========================================
+   APP: HOME (DASHBOARD)
+   ========================================= */
+.disk-bar-container { background: #333; height: 25px; border-radius: 15px; overflow: hidden; display: flex; }
+.disk-segment-used { background: #5dbca5; transition: width 1s ease-in-out; }
+.disk-segment-free { background: rgba(255,255,255,0.1); flex-grow: 1; }
+.stat-card { background: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 20px; transition: border-color 0.2s; }
+.stat-card:hover { border-color: #5dbca5; }
+.icon-box { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+
+/* =========================================
+   APP: MAPS
+   ========================================= */
+.map-card { background-color: #1e1e1e; border: 1px solid #444; color: #ffffff; transition: 0.2s;}
+.map-card:hover { border-color: #dc3545; }
+.map-coords { color: #888; font-size: 0.85em; font-family: monospace; }
+
+/* =========================================
+   APP: KIWIX
+   ========================================= */
+.collapse-btn-container { opacity: 0; transition: opacity 0.3s ease-in-out; text-align: center; margin-top: -10px; margin-bottom: 20px;}
+#terminal-container:hover .collapse-btn-container, #maps-terminal-container:hover .collapse-btn-container { opacity: 1; }
+
+.filter-active { background-color: #198754 !important; color: white !important; border-color: #198754 !important;}
+.filter-inactive { background-color: transparent !important; color: #198754 !important; border-color: #198754 !important;}
+
+/* =========================================
+   FLOATING ADJUSTMENTS (Z-INDEX AND POSITION)
+   ========================================= */
+.floating-filter {
+    bottom: 0;
+}
+
+/* On phones, move the button above the bottom menu */
+@media (max-width: 767.98px) {
+    .floating-filter {
+        bottom: 80px !important; 
+    }
+
+    /* =========================================
+       MOBILE SPACING (CARD EXPERIENCE)
+       ========================================= */
+    /* 1. Add margins to the main container to separate it from the phone edges */
+    .app-panel {
+        padding-left: 15px !important;
+        padding-right: 15px !important;
+    }
+    
+    /* 2. Separate the terminal from the search box with a small top margin */
+    #terminal, #kiwix-terminal {
+        margin-top: 15px !important;
+    }
+    
+    /* 3. The key: Force a bottom margin on EACH card when stacked (col-12) */
+    .zim-card, .map-card {
+        margin-bottom: 15px !important; 
+    }
+    
+    /* 4. Increase the general bottom padding to ensure the last card and floating button have space before the tab menu. */
+    .app-panel.pb-5 {
+        padding-bottom: 120px !important; 
+    }
+}

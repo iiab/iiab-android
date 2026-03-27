@@ -1,0 +1,102 @@
+<div id="panel-home" class="app-panel pb-5">
+    
+    <div class="d-flex justify-content-between align-items-end mb-4 border-bottom border-secondary pb-3">
+        <div>
+            <h2 class="mb-0 text-light fw-bold">My Digital Library</h2>
+            <div class="text-secondary" style="font-size: 1.1em;">
+                <span id="sys-hostname" class="text-info fw-bold">Loading...</span> &nbsp;·&nbsp; 
+                IP: <span id="sys-ip">...</span> &nbsp;·&nbsp; 
+                Uptime: <span id="sys-uptime">...</span>
+            </div>
+        </div>
+        <div class="text-end text-secondary">
+            <span class="badge bg-success">Online</span>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        
+        <div class="mb-4">
+            <div class="d-flex justify-content-between mb-1">
+                <span class="fw-bold text-light">💾 Main Storage</span>
+                <span class="text-secondary small"><span id="disk-used-text">...</span> / <span id="disk-total-text">...</span></span>
+            </div>
+            <div class="disk-bar-container mb-1" style="height: 18px;">
+                <div id="disk-used-bar" class="disk-segment-used" style="width: 0%;"></div>
+                <div class="disk-segment-free"></div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-light small">⚡ RAM Memory</span>
+                    <span class="text-secondary small" style="font-size: 0.8em;" id="ram-text">...</span>
+                </div>
+                <div class="disk-bar-container" style="height: 6px;">
+                    <div id="ram-used-bar" style="background: #e8a020; transition: width 1s; width: 0%;"></div>
+                    <div class="disk-segment-free"></div>
+                </div>
+            </div>
+            
+            <div class="col-6">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-light small">💽 Swap (Virtual)</span>
+                    <span class="text-secondary small" style="font-size: 0.8em;" id="swap-text">...</span>
+                </div>
+                <div class="disk-bar-container" style="height: 6px;">
+                    <div id="swap-used-bar" style="background: #7b8dd4; transition: width 1s; width: 0%;"></div>
+                    <div class="disk-segment-free"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <h4 class="mb-3 text-secondary">Installed Modules</h4>
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="stat-card d-flex align-items-center cursor-pointer" onclick="switchTab('kiwix')" style="cursor: pointer;">
+                <div class="icon-box" style="background: rgba(232, 160, 32, 0.2); color: #e8a020;">📚</div>
+                <div class="ms-3">
+                    <h5 class="mb-0 text-light">Kiwix Manager</h5>
+                    <div class="text-secondary small">Browse and download Wikipedia offline</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="stat-card d-flex align-items-center cursor-pointer" onclick="switchTab('maps')" style="cursor: pointer;">
+                <div class="icon-box" style="background: rgba(93, 188, 165, 0.2); color: #5dbca5;">🗺️</div>
+                <div class="ms-3">
+                    <h5 class="mb-0 text-light">Map Extractor</h5>
+                    <div class="text-secondary small">Manage OpenStreetMap tiles</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Request data on load
+    socket.emit('request_home_stats');
+
+    // Receive and render data
+    socket.on('home_stats_ready', (stats) => {
+        document.getElementById('sys-hostname').textContent = stats.hostname;
+        document.getElementById('sys-ip').textContent = stats.ip;
+        document.getElementById('sys-uptime').textContent = stats.uptime;
+        
+        // Disk
+        document.getElementById('disk-used-text').textContent = stats.diskUsed;
+        document.getElementById('disk-total-text').textContent = stats.diskTotal;
+        document.getElementById('disk-used-bar').style.width = stats.diskPercent + '%';
+
+        // RAM
+        document.getElementById('ram-text').textContent = `${stats.ramUsed} / ${stats.ramTotal}`;
+        document.getElementById('ram-used-bar').style.width = stats.ramPercent + '%';
+
+        // Swap
+        document.getElementById('swap-text').textContent = `${stats.swapUsed} / ${stats.swapTotal}`;
+        document.getElementById('swap-used-bar').style.width = stats.swapPercent + '%';
+    });
+</script>

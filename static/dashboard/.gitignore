@@ -1,0 +1,14 @@
+# Dependencias
+node_modules/
+
+# Archivos de entorno y logs
+.env
+npm-debug.log*
+
+# Archivos compilados (si en el futuro decides compilar el TS)
+dist/
+build/
+
+# Archivos del sistema operativo (Mac/Linux)
+.DS_Store
+Thumbs.db
