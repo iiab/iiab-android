@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IIAB-oA | Dashboard</title>
-    
+
     <link href="vendor/bootstrap.min.css" rel="stylesheet">
     <link href="css/dashboard.css" rel="stylesheet">
-    
+
     <script src="vendor/bootstrap.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/dashboard.js"></script>
 </head>
-<body class="bg-dark text-light">
+<body>
 <div class="container-fluid">
     <div class="row">
         <%- include('./components/sidebar') %>
-        
+
         <div class="col-md-9 col-lg-10 p-4">
             <%- include('./components/app_home') %>
             <%- include('./components/app_maps') %>

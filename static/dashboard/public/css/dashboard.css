@@ -1,28 +1,122 @@
 /* =========================================
-   BASE STYLES
+   VARIABLES & THEMING
+   ========================================= */
+:root {
+    /* Geometry & Ergonomics */
+    --app-radius: 12px;
+    --transition-speed: 0.3s;
+    --accent-color: #0d6efd;
+
+    /* Light Mode Custom Colors */
+    --bg-main: #f8f9fa;
+    --surface-bg: #ffffff;
+    --sidebar-bg: #ffffff;
+    --border-color: rgba(0,0,0,0.1);
+    --hover-bg: rgba(0,0,0,0.05);
+    --text-main: #212529;
+    --text-secondary: #495057;
+}
+
+[data-bs-theme='dark'] {
+    /* Dark Mode Custom Colors (Preserving your exact original shades) */
+    --bg-main: #121212;
+    --surface-bg: #1e1e1e;
+    --sidebar-bg: #121212;
+    --border-color: #333333;
+    --hover-bg: rgba(255,255,255,0.1);
+    --text-main: #f8f9fa;
+    --text-secondary: #ced4da;
+}
+
+/* =========================================
+   BASE STYLES & GEOMETRY
    ========================================= */
 body { 
-    background-color: #121212; 
-    color: #ffffff; 
+    font-family: 'Inter', -apple-system, sans-serif;
+    background-color: var(--bg-main) !important;
+    color: var(--text-main) !important;
+    transition: background-color var(--transition-speed), color var(--transition-speed);
     overflow-x: hidden; 
 }
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-main) !important;
+}
+
 .hidden-section { 
     display: none !important; 
 }
 
+/* Universal Card Geometry & Elevation */
+.card, .app-panel, .stat-card, .map-card {
+    border-radius: var(--app-radius) !important;
+    background-color: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    transition: all var(--transition-speed) ease;
+}
+
+/* Add depth/shadows only in Dark Mode */
+[data-bs-theme='dark'] .card,
+[data-bs-theme='dark'] .app-panel,
+[data-bs-theme='dark'] .stat-card,
+[data-bs-theme='dark'] .map-card {
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+/* Standardized Buttons */
+.btn {
+    border-radius: 8px;
+    transition: transform 0.1s active, background-color 0.2s;
+}
+.btn:active {
+    transform: scale(0.96); /* Ergonomic tactile click */
+}
+
+/* Theme Toggle Button */
+#theme-toggle {
+    cursor: pointer;
+    font-size: 1.2rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--hover-bg);
+    border: none;
+    transition: background var(--transition-speed), transform 0.2s;
+}
+#theme-toggle:hover {
+    transform: rotate(15deg);
+}
+
 /* =========================================
-   RESPONSIVE NAVIGATION (SIDEBAR / BOTTOM NAV)
+   RESPONSIVE NAVIGATION
    ========================================= */
-.nav-btn { cursor: pointer; border-radius: 8px; transition: background 0.2s; }
-.nav-btn:hover, .nav-btn.active { background-color: rgba(255,255,255,0.1); }
-.nav-icon { display: inline-block; margin-right: 10px; }
+.nav-btn {
+    cursor: pointer;
+    border-radius: var(--app-radius);
+    transition: background 0.2s, transform 0.2s;
+}
+.nav-btn:hover, .nav-btn.active {
+    background-color: var(--hover-bg);
+}
+.nav-icon {
+    display: inline-block;
+    margin-right: 10px;
+}
 
 /* Desktop (PC) */
 @media (min-width: 768px) {
     .app-sidebar {
         min-height: 100vh;
-        background-color: #1e1e1e;
-        border-right: 1px solid #333;
+        background-color: var(--sidebar-bg);
+        border-right: 1px solid var(--border-color);
+        transition: background-color var(--transition-speed);
+    }
+    .nav-btn:hover {
+        transform: translateX(5px); /* Slide effect on desktop */
     }
 }
 
@@ -34,9 +128,10 @@ body {
         left: 0;
         width: 100%;
         z-index: 1050; 
-        background-color: #121212 !important;
-        border-top: 1px solid #333;
+        background-color: var(--sidebar-bg) !important;
+        border-top: 1px solid var(--border-color);
         padding: 10px 0 !important;
+        transition: background-color var(--transition-speed);
     }
     .sidebar-title { display: none; } 
     .app-sidebar .nav {
@@ -51,71 +146,115 @@ body {
         font-size: 0.75rem; 
     }
     .nav-icon { margin-right: 0; margin-bottom: 2px; }
-    
-    body { padding-bottom: 80px; } /* Prevents the menu from overlapping the content */
-    .col-md-9 { padding: 15px !important; } /* Less lateral padding on mobile */
+
+    body { padding-bottom: 80px; }
+    .col-md-9 { padding: 15px !important; }
 }
 
 /* =========================================
    APP: HOME (DASHBOARD)
    ========================================= */
-.disk-bar-container { background: #333; height: 25px; border-radius: 15px; overflow: hidden; display: flex; }
+.disk-bar-container {
+    background: var(--border-color);
+    height: 25px;
+    border-radius: var(--app-radius);
+    overflow: hidden;
+    display: flex;
+}
 .disk-segment-used { background: #5dbca5; transition: width 1s ease-in-out; }
-.disk-segment-free { background: rgba(255,255,255,0.1); flex-grow: 1; }
-.stat-card { background: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 20px; transition: border-color 0.2s; }
+.disk-segment-free { background: transparent; flex-grow: 1; }
+
+.stat-card { padding: 20px; }
 .stat-card:hover { border-color: #5dbca5; }
-.icon-box { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.icon-box {
+    width: 50px;
+    height: 50px;
+    border-radius: var(--app-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
 
 /* =========================================
-   APP: MAPS
+   APP: MAPS & KIWIX
    ========================================= */
-.map-card { background-color: #1e1e1e; border: 1px solid #444; color: #ffffff; transition: 0.2s;}
 .map-card:hover { border-color: #dc3545; }
 .map-coords { color: #888; font-size: 0.85em; font-family: monospace; }
 
-/* =========================================
-   APP: KIWIX
-   ========================================= */
-.collapse-btn-container { opacity: 0; transition: opacity 0.3s ease-in-out; text-align: center; margin-top: -10px; margin-bottom: 20px;}
-#terminal-container:hover .collapse-btn-container, #maps-terminal-container:hover .collapse-btn-container { opacity: 1; }
+.collapse-btn-container {
+    opacity: 0;
+    transition: opacity var(--transition-speed) ease-in-out;
+    text-align: center;
+    margin-top: -10px;
+    margin-bottom: 20px;
+}
+#terminal-container:hover .collapse-btn-container,
+#maps-terminal-container:hover .collapse-btn-container {
+    opacity: 1;
+}
 
 .filter-active { background-color: #198754 !important; color: white !important; border-color: #198754 !important;}
 .filter-inactive { background-color: transparent !important; color: #198754 !important; border-color: #198754 !important;}
 
 /* =========================================
-   FLOATING ADJUSTMENTS (Z-INDEX AND POSITION)
+   FLOATING ADJUSTMENTS & MOBILE SPACING
    ========================================= */
-.floating-filter {
-    bottom: 0;
-}
+.floating-filter { bottom: 0; }
 
-/* On phones, move the button above the bottom menu */
 @media (max-width: 767.98px) {
-    .floating-filter {
-        bottom: 80px !important; 
-    }
+    .floating-filter { bottom: 80px !important; }
 
-    /* =========================================
-       MOBILE SPACING (CARD EXPERIENCE)
-       ========================================= */
-    /* 1. Add margins to the main container to separate it from the phone edges */
     .app-panel {
         padding-left: 15px !important;
         padding-right: 15px !important;
     }
-    
-    /* 2. Separate the terminal from the search box with a small top margin */
-    #terminal, #kiwix-terminal {
-        margin-top: 15px !important;
-    }
-    
-    /* 3. The key: Force a bottom margin on EACH card when stacked (col-12) */
-    .zim-card, .map-card {
-        margin-bottom: 15px !important; 
-    }
-    
-    /* 4. Increase the general bottom padding to ensure the last card and floating button have space before the tab menu. */
-    .app-panel.pb-5 {
-        padding-bottom: 120px !important; 
-    }
+
+    #terminal, #kiwix-terminal { margin-top: 15px !important; }
+    .zim-card, .map-card { margin-bottom: 15px !important; }
+
+    .app-panel.pb-5 { padding-bottom: 120px !important; }
+}
+/* =========================================
+   TYPOGRAPHY & REFINEMENTS
+   ========================================= */
+/* Force all cards, modals, and list items to obey the theme background */
+.card, .stat-card, .map-card, .zim-card, .list-group-item, .modal-content, .alert {
+    background-color: var(--surface-bg) !important;
+    color: var(--bs-body-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* All Uppercase for Navigation */
+.nav-text,
+.sidebar-title {
+    text-transform: uppercase;
+    font-size: 0.80rem;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+
+/* All Uppercase for Action Buttons */
+.btn {
+    text-transform: uppercase;
+    font-size: 0.80rem;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    padding: 0.6rem 1.2rem;
+}
+
+/* Increase contrast on secondary texts */
+.text-secondary, .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+/* Fix for Search Inputs and Textareas in both themes */
+.form-control {
+    background-color: var(--surface-bg) !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--border-color) !important;
+}
+.form-control::placeholder {
+    color: var(--text-secondary) !important;
+    font-size: 1rem;
 }

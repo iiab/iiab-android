@@ -1,23 +1,30 @@
 <div class="col-md-3 col-lg-2 p-3 app-sidebar" id="sidebar">
     <h4 class="text-center text-primary mb-4 sidebar-title">IIAB-oA</h4>
     
-    <ul class="nav flex-column gap-2 w-100">
+    <ul class="nav flex-column gap-2 w-100 h-100">
         <li class="nav-item">
-            <a class="nav-link active text-light nav-btn" id="tab-home" onclick="switchTab('home')">
+            <a class="nav-link active nav-btn text-body" id="tab-home" onclick="switchTab('home')">
                 <span class="nav-icon fs-4">🏠</span>
-                <span class="nav-text">Home</span>
+                <span class="nav-text" data-i18n="nav_home">Home</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link text-light nav-btn" id="tab-kiwix" onclick="switchTab('kiwix')">
+            <a class="nav-link nav-btn text-body" id="tab-kiwix" onclick="switchTab('kiwix')">
                 <span class="nav-icon fs-4">📚</span>
-                <span class="nav-text">Kiwix</span>
+                <span class="nav-text" data-i18n="nav_kiwix">Kiwix</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link text-light nav-btn" id="tab-maps" onclick="switchTab('maps')">
+            <a class="nav-link nav-btn text-body" id="tab-maps" onclick="switchTab('maps')">
                 <span class="nav-icon fs-4">🗺️</span>
-                <span class="nav-text">Maps</span>
+                <span class="nav-text" data-i18n="nav_maps">Maps</span>
+            </a>
+        </li>
+
+        <li class="nav-item mt-md-4">
+            <a class="nav-link nav-btn text-body" onclick="themeManager.cycleTheme()">
+                <span class="nav-icon fs-4" id="theme-toggle-icon">🌓</span>
+                <span class="nav-text">Theme</span>
             </a>
         </li>
     </ul>

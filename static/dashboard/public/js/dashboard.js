@@ -4,6 +4,36 @@
 
 const socket = io();
 
+// --- Theme Manager ---
+const themeManager = {
+    init() {
+        const savedTheme = localStorage.getItem('theme') || 'auto';
+        this.setTheme(savedTheme);
+    },
+    setTheme(theme) {
+        const root = document.documentElement;
+        if (theme === 'auto') {
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            root.setAttribute('data-bs-theme', systemTheme);
+        } else {
+            root.setAttribute('data-bs-theme', theme);
+        }
+        localStorage.setItem('theme', theme);
+        this.updateToggleButton(theme);
+    },
+    cycleTheme() {
+        const current = localStorage.getItem('theme') || 'auto';
+        const next = current === 'light' ? 'dark' : (current === 'dark' ? 'auto' : 'light');
+        this.setTheme(next);
+    },
+    updateToggleButton(theme) {
+        const iconSpan = document.getElementById('theme-toggle-icon');
+        if (!iconSpan) return;
+        const icons = { light: '☀️', dark: '🌙', auto: '🌓' };
+        iconSpan.innerText = icons[theme] || icons.auto;
+    }
+};
+
 // --- i18n System ---
 const applyTranslations = () => {
     if (!window.i18n) return;
@@ -32,6 +62,7 @@ function switchTab(tabName) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    themeManager.init();
     loadLanguage();
     switchTab('home');
 });

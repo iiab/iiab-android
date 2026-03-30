@@ -1,11 +1,11 @@
 <div id="panel-maps" class="app-panel hidden-section pb-5">
-    <h2 class="mb-4 text-light fw-bold border-bottom border-secondary pb-3">Map Extraction Dashboard</h2>
+    <h2 class="mb-4 fw-bold border-bottom border-secondary pb-3">Map Extraction Dashboard</h2>
     
-    <div class="card bg-dark text-light mb-4 p-3 border-secondary shadow-sm">
+    <div class="card mb-4 p-3 border-secondary shadow-sm">
         <label for="raw-command" class="form-label text-warning fw-bold">Execute "New Maps" shell command:</label>
         <div class="row g-2 align-items-stretch">
             <div class="col-12 col-md-10">
-                <textarea id="raw-command" class="form-control bg-secondary text-light border-0 h-100" rows="2" style="resize: none;" placeholder="e.g.: sudo /opt/iiab/maps/..."></textarea>
+                <textarea id="raw-command" class="form-control border-0 h-100" rows="2" style="resize: none;" placeholder="e.g.: sudo /opt/iiab/maps/..."></textarea>
             </div>
             <div class="col-12 col-md-2">
                 <button id="btn-start" class="btn btn-primary w-100 h-100 fw-bold">Start</button>
@@ -21,7 +21,7 @@
         </div>
     </div>
 
-    <div id="controls-yn" class="card bg-dark border-warning p-3 hidden-section shadow mb-4">
+    <div id="controls-yn" class="card border-warning p-3 hidden-section shadow mb-4">
         <div class="d-flex justify-content-between align-items-center">
             <span class="text-warning fw-bold">⚠️ The system requires your confirmation to continue:</span>
             <div>
@@ -34,8 +34,8 @@
     <hr class="border-secondary mb-4">
 
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="text-primary mb-0">🗺️ Existing Regions on Maps Server</h4>
-        <button id="btn-refresh-maps" class="btn btn-sm btn-outline-primary">🔄 Refresh List</button>
+        <h4 class="text-primary mb-0">🗺️ Existing Regions</h4>
+        <button id="btn-refresh-maps" class="btn btn-sm btn-outline-primary">Refresh List</button>
     </div>
     
     <div id="maps-status" class="alert alert-info d-flex align-items-center">
@@ -121,7 +121,7 @@
     function renderMapsGrid() {
         mapsContainer.innerHTML = '';
         if (mapsInMemory.length === 0) {
-            mapsContainer.innerHTML = `<div class="col-12"><div class="alert bg-dark text-secondary text-center border-secondary">No map regions registered in extracts.json.</div></div>`;
+            mapsContainer.innerHTML = `<div class="col-12"><div class="alert text-secondary text-center border-secondary" style="border: 1px solid var(--border-color);">No map regions registered in extracts.json.</div></div>`;
             return;
         }
 
