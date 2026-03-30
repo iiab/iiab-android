@@ -9,15 +9,11 @@ SERVICE_NAME="dash-node"
 
 APP_DIR="/library/dashboard"
 APP_CMD="npx ts-node server.ts"
-
-PIDFILE="/run/dash-node.pid"
 LOGFILE="/var/log/dash-node.log"
 
 running() {
-  [ -s "$PIDFILE" ] || return 1
-  pid="$(cat "$PIDFILE" 2>/dev/null || echo '')"
-  [ -n "$pid" ] || return 1
-  kill -0 "$pid" 2>/dev/null
+  # Look directly for the actual process name, ignoring the PID file
+  pgrep -f "ts-node server.ts" >/dev/null 2>&1
 }
 
 start() {
@@ -29,7 +25,6 @@ start() {
   echo "[pdsm:$SERVICE_NAME] starting..."
   cd "$APP_DIR" || return 1
   nohup $APP_CMD > "$LOGFILE" 2>&1 &
-  echo $! > "$PIDFILE"
 
   for i in $(seq 1 "${PDSM_START_TIMEOUT:-5}"); do
     if running; then
@@ -50,27 +45,27 @@ stop() {
   fi
 
   echo "[pdsm:$SERVICE_NAME] stopping..."
-  pid="$(cat "$PIDFILE")"
-  kill "$pid" 2>/dev/null || true
+  # Terminate by name
+  pkill -f "ts-node server.ts" 2>/dev/null || true
 
   for i in $(seq 1 "${PDSM_START_TIMEOUT:-5}"); do
     if ! running; then
-      rm -f "$PIDFILE"
       echo "[pdsm:$SERVICE_NAME] stopped"
       return 0
     fi
     sleep 1
   done
 
-  kill -9 "$pid" 2>/dev/null || true
-  rm -f "$PIDFILE"
+  # Force kill if it resists
+  pkill -9 -f "ts-node server.ts" 2>/dev/null || true
   echo "[pdsm:$SERVICE_NAME] forced stop"
   return 1
 }
 
 status() {
   if running; then
-    echo "[pdsm:$SERVICE_NAME] running (PID: $(cat $PIDFILE))"
+    real_pid=$(pgrep -f "ts-node server.ts" | head -n 1)
+    echo "[pdsm:$SERVICE_NAME] running (PID: $real_pid)"
     return 0
   fi
   echo "[pdsm:$SERVICE_NAME] not running"

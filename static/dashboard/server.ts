@@ -39,6 +39,37 @@ io.on('connection', (socket: Socket) => {
 const PORT = 4000;
 server.listen(PORT, () => {
     console.log(`===========================================`);
-    console.log(`🚀 IIAB-oA Dashboard active on port ${PORT}`);
+    console.log(`IIAB-oA Dashboard active on port ${PORT}`);
     console.log(`===========================================`);
 });
+
+// ==========================================
+// Graceful Shutdown
+// ==========================================
+
+// Function to handle the shutdown process
+const gracefulShutdown = (signal: string) => {
+    console.log(`\n[System] Received ${signal}. Starting graceful shutdown...`);
+
+    // Stop accepting new connections
+    server.close(() => {
+        console.log('[System] HTTP server closed. No longer accepting connections.');
+
+        // TODO: Add cleanly stop aria2c or python scripts if they are running
+
+        console.log('[System] Cleanup complete. Exiting safely.');
+        process.exit(0);
+    });
+
+    // If the server takes too long to close (e.g., stuck websockets), force it after 5 seconds
+    setTimeout(() => {
+        console.error('[System] Could not close connections in time. Forcing shutdown.');
+        process.exit(1);
+    }, 5000);
+};
+
+// Listen for PDSM pkill
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+// Listen for CTRL+C in the terminal
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
