@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import path from 'path';
+import helmet from 'helmet';
 
 // Import our modules (event controllers)
 import { handleMapsEvents } from './sockets/maps.socket';
@@ -11,6 +12,15 @@ import { handleHomeEvents } from './sockets/home.socket';
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// 🛡️ SECURITY SHIELD (HELMET)
+// ==========================================
+app.use(helmet({
+    // No https, no SSL, no HSTS.
+    hsts: false,
+    // Check websockets works without restrictions
+    contentSecurityPolicy: false
+}));
 
 // EJS views and static files configuration
 app.set('view engine', 'ejs');
