@@ -302,6 +302,8 @@ install_iiaboa_dashboard() {
   local dash_dest="/library/dashboard"
 
   log "Run nodejs installation role"
+  sed -i '/^nodejs_install:/d' /etc/iiab/local_vars.yml
+  echo "nodejs_install: True" | tee -a /etc/iiab/local_vars.yml
   (cd /opt/iiab/iiab && bash runrole nodejs)
 
   # Copy dashboard files
