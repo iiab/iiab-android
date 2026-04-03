@@ -479,6 +479,24 @@ step_termux_base() {
     rm -f "$stamp"
   fi
 
+# -------------------------
+# Enable communication with Controller APK
+# -------------------------
+  local props="${HOME}/.termux/termux.properties"
+  mkdir -p "${HOME}/.termux"
+  touch "$props"
+
+  if ! grep -qE '^allow-external-apps\s*=\s*true' "$props"; then
+    log "Enabling allow-external-apps for the IIAB Controller..."
+
+    if grep -qE '^#?\s*allow-external-apps\s*=' "$props"; then
+      sed -i 's/^#\?\s*allow-external-apps\s*=.*/allow-external-apps = true/' "$props"
+    else
+      echo "allow-external-apps = true" >> "$props"
+    fi
+    have termux-reload-settings && termux-reload-settings || true
+  fi
+
   log "Updating Termux packages (noninteractive) and installing baseline dependencies..."
   export DEBIAN_FRONTEND=noninteractive
 

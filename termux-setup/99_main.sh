@@ -291,7 +291,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --with-adb) set_mode "with-adb"; shift ;;
     --adb-only) set_mode "adb-only"; shift ;;
-    --login|--start) set_mode "login"; shift ;;
+    --start|--login) set_mode "login"; shift ;;
+    --stop) set_mode "stop"; shift ;;
     --connect-only)
       set_mode "connect-only"
       ONLY_CONNECT=1
@@ -476,6 +477,10 @@ main() {
       iiab_login
       ;;
 
+    stop)
+      iiab_stop
+      ;;
+
     backup-rootfs)
       cmd_backup_rootfs "$BACKUP_RESTORE_TARGET"
       ;;
@@ -577,7 +582,7 @@ main() {
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       boxyproxy_install_or_update || true
-      #boxyproxy_start || true # enable on stage 2
+      boxyproxy_start || true
       install_iiab_android_cmd || true
       if sdk_is_num && (( ANDROID_SDK >= 34 )); then
         # Android 14+

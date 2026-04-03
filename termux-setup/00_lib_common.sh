@@ -324,7 +324,11 @@ iiab_login() {
 
   # Don't let a non-zero exit from proot skip cleanup (set -e).
   set +e
-  if [[ -r /dev/tty ]]; then
+   if [[ "${INTENT_MODE:-}" == "headless" ]]; then
+     boxyp_log "Running in APK Headless mode (no TTY, sleep infinity)"
+     proot-distro login iiab -- bash -lc "/usr/local/bin/pdsm start && sleep infinity"
+     rc=$?
+   elif [[ -r /dev/tty ]]; then
     proot-distro login iiab </dev/tty >&"$outfd" 2>&"$errfd"
     rc=$?
   else
@@ -339,6 +343,34 @@ iiab_login() {
 
   power_mode_login_exit || true
   return $rc
+}
+
+iiab_stop() {
+  log "Stopping IIAB environment..."
+
+  # Stop the 'boxyproxy' proxy
+  boxyproxy_stop >/dev/null 2>&1 || true
+
+  # Graceful shutdown of internal services using 'pdsm'
+  if iiab_exists; then
+    log "Executing 'pdsm stop' for internal services..."
+    # Send the command into proot. The script won't fail if a service fails.
+    proot-distro login iiab -- /usr/local/bin/pdsm stop || warn "Partial failure while stopping services via pdsm."
+  fi
+
+  # Allow a few seconds for processes to save data and exit
+  sleep 3
+
+  # Final zombie cleanup
+  # We kill any orphaned processes pdsm might left hanging after 3 seconds
+  if pkill -0 -f "proot.*iiab" 2>/dev/null; then
+    log "Cleaning up remaining processes..."
+    pkill -TERM -f "proot.*iiab" || true
+    sleep 1
+    pkill -KILL -f "proot.*iiab" 2>/dev/null || true
+  fi
+
+  ok "All IIAB services have been successfully stopped."
 }
 
 ### --- Pre-flight Check & Metrics ---

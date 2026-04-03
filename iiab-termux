@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# GENERATED FILE: 2026-03-27T10:46:43-06:00 - do not edit directly.
+# GENERATED FILE: 2026-04-02T20:56:53-06:00 - do not edit directly.
 # Source modules: termux-setup/*.sh + manifest.sh
 # Rebuild: (cd termux-setup && bash build_bundle.sh)
 # -----------------------------------------------------------------------------
@@ -335,7 +335,11 @@ iiab_login() {
 
   # Don't let a non-zero exit from proot skip cleanup (set -e).
   set +e
-  if [[ -r /dev/tty ]]; then
+   if [[ "${INTENT_MODE:-}" == "headless" ]]; then
+     boxyp_log "Running in APK Headless mode (no TTY, sleep infinity)"
+     proot-distro login iiab -- bash -lc "/usr/local/bin/pdsm start && sleep infinity"
+     rc=$?
+   elif [[ -r /dev/tty ]]; then
     proot-distro login iiab </dev/tty >&"$outfd" 2>&"$errfd"
     rc=$?
   else
@@ -350,6 +354,34 @@ iiab_login() {
 
   power_mode_login_exit || true
   return $rc
+}
+
+iiab_stop() {
+  log "Stopping IIAB environment..."
+
+  # Stop the 'boxyproxy' proxy
+  boxyproxy_stop >/dev/null 2>&1 || true
+
+  # Graceful shutdown of internal services using 'pdsm'
+  if iiab_exists; then
+    log "Executing 'pdsm stop' for internal services..."
+    # Send the command into proot. The script won't fail if a service fails.
+    proot-distro login iiab -- /usr/local/bin/pdsm stop || warn "Partial failure while stopping services via pdsm."
+  fi
+
+  # Allow a few seconds for processes to save data and exit
+  sleep 3
+
+  # Final zombie cleanup
+  # We kill any orphaned processes pdsm might left hanging after 3 seconds
+  if pkill -0 -f "proot.*iiab" 2>/dev/null; then
+    log "Cleaning up remaining processes..."
+    pkill -TERM -f "proot.*iiab" || true
+    sleep 1
+    pkill -KILL -f "proot.*iiab" 2>/dev/null || true
+  fi
+
+  ok "All IIAB services have been successfully stopped."
 }
 
 ### --- Pre-flight Check & Metrics ---
@@ -1145,6 +1177,24 @@ step_termux_base() {
     fi
     warn "Baseline stamp found but prerequisites are missing; forcing reinstall."
     rm -f "$stamp"
+  fi
+
+# -------------------------
+# Enable communication with Controller APK
+# -------------------------
+  local props="${HOME}/.termux/termux.properties"
+  mkdir -p "${HOME}/.termux"
+  touch "$props"
+
+  if ! grep -qE '^allow-external-apps\s*=\s*true' "$props"; then
+    log "Enabling allow-external-apps for the IIAB Controller..."
+
+    if grep -qE '^#?\s*allow-external-apps\s*=' "$props"; then
+      sed -i 's/^#\?\s*allow-external-apps\s*=.*/allow-external-apps = true/' "$props"
+    else
+      echo "allow-external-apps = true" >> "$props"
+    fi
+    have termux-reload-settings && termux-reload-settings || true
   fi
 
   log "Updating Termux packages (noninteractive) and installing baseline dependencies..."
@@ -3259,7 +3309,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --with-adb) set_mode "with-adb"; shift ;;
     --adb-only) set_mode "adb-only"; shift ;;
-    --login|--start) set_mode "login"; shift ;;
+    --start|--login) set_mode "login"; shift ;;
+    --stop) set_mode "stop"; shift ;;
     --connect-only)
       set_mode "connect-only"
       ONLY_CONNECT=1
@@ -3444,6 +3495,10 @@ main() {
       iiab_login
       ;;
 
+    stop)
+      iiab_stop
+      ;;
+
     backup-rootfs)
       cmd_backup_rootfs "$BACKUP_RESTORE_TARGET"
       ;;
@@ -3545,7 +3600,7 @@ main() {
       step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       boxyproxy_install_or_update || true
-      #boxyproxy_start || true # enable on stage 2
+      boxyproxy_start || true
       install_iiab_android_cmd || true
       if sdk_is_num && (( ANDROID_SDK >= 34 )); then
         # Android 14+
