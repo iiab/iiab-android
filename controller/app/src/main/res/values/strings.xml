@@ -69,8 +69,9 @@
     <string name="dash_state_online">IIAB-oA is online.</string>
     <string name="dash_state_termux_only">Termux found, go to Installation tab to manage it.</string>
     <string name="dash_termux_searching">Searching for installation...</string>
-    <string name="dash_arch_info_termux">"Termux arch: "</string>
-    <string name="dash_arch_info_pos">"PRoot-Distro arch: "</string>
+    <string name="dash_architectures_title">Architectures</string>
+    <string name="dash_arch_termux">"Termux: "</string>
+    <string name="dash_arch_proot">"PRoot-Distro: "</string>
 
     <string name="dash_installed_modules">Installed Modules</string>
     <string name="dash_books">Books</string>
@@ -246,4 +247,5 @@
     <string name="ota_toast_latest">You already have the latest version installed.</string>
     <string name="ota_toast_error_server">Error contacting server (%1$d)</string>
     <string name="ota_toast_error_network">Network error or invalid JSON.</string>
+    <string name="ota_toast_cooldown">Please wait a few seconds before checking again.</string>
 </resources>

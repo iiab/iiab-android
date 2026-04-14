@@ -92,6 +92,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private ImageButton btnSettings;
     private android.widget.ImageView headerIcon;
     private long updateDownloadId = -1;
+    private long lastUpdateCheckTime = 0;
 
     // Tabs UI
     private TabLayout tabLayout;
@@ -202,7 +203,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }).attach();
         versionFooter = findViewById(R.id.version_text);
         setVersionFooter();
-        versionFooter.setOnClickListener(v -> checkForUpdates(true));
+        // Check for version with 10s cooldown span
+        versionFooter.setOnClickListener(v -> {
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - lastUpdateCheckTime < 10000) {
+                Toast.makeText(this, R.string.ota_toast_cooldown, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            lastUpdateCheckTime = currentTime;
+            checkForUpdates(true);
+        });
 
         viewPager.setCurrentItem(0, false);
 
