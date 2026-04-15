@@ -70,7 +70,7 @@
     <string name="dash_state_termux_only">Termux मिला, इसे प्रबंधित करने के लिए इंस्टालेशन टैब पर जाएं।</string>
     <string name="dash_termux_searching">इंस्टालेशन खोज रहा है...</string>
 
-    <string name="dash_installed_modules">इंस्टॉल किए गए मॉड्यूल</string>
+    <string name="dash_installed_modules">उपलब्ध मॉड्यूल</string>
     <string name="dash_books">पुस्तकें</string>
     <string name="dash_kiwix">Kiwix</string>
     <string name="dash_kolibri">Kolibri</string>

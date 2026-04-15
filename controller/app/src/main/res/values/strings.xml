@@ -73,7 +73,7 @@
     <string name="dash_arch_termux">"Termux: "</string>
     <string name="dash_arch_proot">"PRoot-Distro: "</string>
 
-    <string name="dash_installed_modules">Installed Modules</string>
+    <string name="dash_installed_modules">Available Modules</string>
     <string name="dash_books">Books</string>
     <string name="dash_kiwix">Kiwix</string>
     <string name="dash_kolibri">Kolibri</string>

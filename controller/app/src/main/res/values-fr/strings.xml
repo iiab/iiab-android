@@ -70,7 +70,7 @@
     <string name="dash_state_termux_only">Termux trouvé, allez dans l\'onglet Installation pour le gérer.</string>
     <string name="dash_termux_searching">Recherche d\'installation...</string>
 
-    <string name="dash_installed_modules">Modules installés</string>
+    <string name="dash_installed_modules">Modules disponibles</string>
     <string name="dash_books">Livres</string>
     <string name="dash_kiwix">Kiwix</string>
     <string name="dash_kolibri">Kolibri</string>

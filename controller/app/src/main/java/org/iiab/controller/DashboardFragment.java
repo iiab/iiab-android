@@ -60,16 +60,29 @@ public class DashboardFragment extends Fragment {
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     private Runnable refreshRunnable;
 
-    // List of modules to scan (Endpoint, Display Name)
-    private final Object[][] TARGET_MODULES = {
-            {"books", R.string.dash_books},
-            {"code", R.string.dash_code},
-            {"kiwix", R.string.dash_kiwix},
-            {"kolibri", R.string.dash_kolibri},
-            {"maps", R.string.dash_maps},
-            {"matomo", R.string.dash_matomo},
-            {"dashboard", R.string.dash_system}
-    };
+    // --- MODULE CONFIGURATION TARGETING SCALABILITY ---
+    private static class IiabModule {
+        String endpoint;
+        int nameResId;
+        boolean requires64Bit;
+
+        IiabModule(String endpoint, int nameResId, boolean requires64Bit) {
+            this.endpoint = endpoint;
+            this.nameResId = nameResId;
+            this.requires64Bit = requires64Bit;
+        }
+    }
+
+    // THE MASTER ROSTER: We can add, remove, or restrict modules here.
+    private final java.util.List<IiabModule> MASTER_ROSTER = java.util.Arrays.asList(
+            new IiabModule("books", R.string.dash_books, false),
+            new IiabModule("code", R.string.dash_code, false),
+            new IiabModule("kiwix", R.string.dash_kiwix, true),
+            new IiabModule("kolibri", R.string.dash_kolibri, false),
+            new IiabModule("maps", R.string.dash_maps, false),
+            new IiabModule("matomo", R.string.dash_matomo, false),
+            new IiabModule("dashboard", R.string.dash_system, false)
+    );
 
     public enum SystemState {
         ONLINE, OFFLINE, DEBIAN_ONLY, INSTALLER, TERMUX_ONLY, NONE
@@ -223,8 +236,22 @@ public class DashboardFragment extends Fragment {
     private void createModuleViews() {
         modulesContainer.removeAllViews();
 
+        // Determine if the installed Termux is 64-bit
+        String arch = getTermuxArch();
+        boolean is64Bit = arch != null && arch.contains("64");
+
+        // Filter the Master Roster based on architecture support
+        java.util.List<IiabModule> activeModules = new java.util.ArrayList<>();
+        for (IiabModule module : MASTER_ROSTER) {
+            if (module.requires64Bit && !is64Bit) {
+                continue; // Skip this module entirely for 32-bit devices
+            }
+            activeModules.add(module);
+        }
+
+        // Build the UI grid dynamically using the filtered list
         int numCols = 3;
-        int numRows = (int) Math.ceil((double) TARGET_MODULES.length / numCols);
+        int numRows = (int) Math.ceil((double) activeModules.size() / numCols);
 
         for (int row = 0; row < numRows; row++) {
             LinearLayout rowLayout = new LinearLayout(requireContext());
@@ -250,7 +277,9 @@ public class DashboardFragment extends Fragment {
 
                 cell.setLayoutParams(cellParams);
 
-                if (index < TARGET_MODULES.length) {
+                if (index < activeModules.size()) {
+                    IiabModule currentMod = activeModules.get(index); // Get the module object
+
                     cell.setOrientation(LinearLayout.HORIZONTAL);
                     cell.setBackgroundResource(R.drawable.rounded_button);
                     cell.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
@@ -268,16 +297,20 @@ public class DashboardFragment extends Fragment {
                             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                     textParams.setMargins(12, 0, 0, 0);
                     name.setLayoutParams(textParams);
-                    name.setText(getString((Integer) TARGET_MODULES[index][1]));
+
+                    // Inject the data from the Master Roster
+                    name.setText(getString(currentMod.nameResId));
                     name.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dash_module_text));
                     name.setTextSize(11f);
                     name.setSingleLine(true);
 
                     cell.addView(led);
                     cell.addView(name);
-                    cell.setTag(TARGET_MODULES[index][0]);
+
+                    // The background ping thread relies on this tag to check the URL!
+                    cell.setTag(currentMod.endpoint);
                 } else {
-                    cell.setVisibility(View.INVISIBLE);
+                    cell.setVisibility(View.INVISIBLE); // Fill empty spaces to keep grid aligned
                 }
 
                 rowLayout.addView(cell);

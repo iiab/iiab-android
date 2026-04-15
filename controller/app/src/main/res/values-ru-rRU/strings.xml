@@ -70,7 +70,7 @@
     <string name="dash_state_termux_only">Termux найден, перейдите на вкладку Установка, чтобы управлять им.</string>
     <string name="dash_termux_searching">Поиск установки...</string>
 
-    <string name="dash_installed_modules">Установленные модули</string>
+    <string name="dash_installed_modules">Доступные модули</string>
     <string name="dash_books">Книги</string>
     <string name="dash_kiwix">Kiwix</string>
     <string name="dash_kolibri">Kolibri</string>

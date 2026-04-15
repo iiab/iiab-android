@@ -73,7 +73,7 @@
     <string name="dash_state_termux_only">Termux encontrado, vaya a la pestaña de Instalación para operarlo.</string>
     <string name="dash_termux_searching">Buscando instalación...</string>
 
-    <string name="dash_installed_modules">Módulos Instalados</string>
+    <string name="dash_installed_modules">Módulos disponibles</string>
     <string name="dash_books">Libros</string>
     <string name="dash_kiwix">Kiwix</string>
     <string name="dash_kolibri">Kolibri</string>
