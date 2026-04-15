@@ -91,6 +91,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private ImageButton themeToggle;
     private ImageButton btnSettings;
     private android.widget.ImageView headerIcon;
+    private TextView badgeTermux;
+    private TextView badgeController;
     private long updateDownloadId = -1;
     private long lastUpdateCheckTime = 0;
 
@@ -252,6 +254,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         themeToggle = findViewById(R.id.theme_toggle);
         btnSettings = findViewById(R.id.btn_settings);
         headerIcon = findViewById(R.id.header_icon);
+        badgeTermux = findViewById(R.id.badge_termux);
+        badgeController = findViewById(R.id.badge_controller);
         ImageButton btnShareQr = findViewById(R.id.btn_share_qr);
 
         // Listeners
@@ -458,6 +462,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
         //  Check permissions status
         updateHeaderIconsOpacity();
+        updatePermissionBadges();
         // Check battery status whenever returning to the app
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -910,6 +915,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }).start();
     }
+
     private void showUpdateDialog(String versionName, String changelog, String downloadUrl) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle(getString(R.string.update_dialog_title, versionName))
@@ -977,6 +983,69 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
             startActivity(intent);
+        }
+    }
+
+    // --- PERMISSION BADGES LOGIC ---
+    private void updatePermissionBadges() {
+        // 1. Calculate Controller missing permissions (Purple Badge)
+        int missingController = 0;
+        if (!hasNotifPermission()) missingController++;
+        if (!hasTermuxPermission()) missingController++;
+        if (!hasStoragePermission()) missingController++;
+        if (!hasBatteryPermission()) missingController++;
+        if (VpnService.prepare(this) != null) missingController++; // VPN Permission check
+
+        if (badgeController != null) {
+            if (missingController > 0) {
+                badgeController.setVisibility(View.VISIBLE);
+                badgeController.setText(String.valueOf(missingController));
+            } else {
+                badgeController.setVisibility(View.GONE);
+            }
+        }
+
+        // --- THE SIGNATURE VERIFIER ---
+        // Let's check if Termux was uninstalled or reinstalled by looking at its unique install timestamp
+        boolean isTermuxInstalled = false;
+        long currentTermuxInstallTime = 0;
+        try {
+            android.content.pm.PackageInfo info = getPackageManager().getPackageInfo("com.termux", 0);
+            isTermuxInstalled = true;
+            currentTermuxInstallTime = info.firstInstallTime; // The definitive truth
+        } catch (PackageManager.NameNotFoundException e) {
+            isTermuxInstalled = false;
+        }
+
+        SharedPreferences internalPrefs = getSharedPreferences(getString(R.string.pref_file_internal), Context.MODE_PRIVATE);
+        long savedTermuxSignature = internalPrefs.getLong("termux_install_signature", 0);
+
+        // If Termux is missing, OR if the signature changed (meaning it was reinstalled), reset our UI flags!
+        if (!isTermuxInstalled || (savedTermuxSignature != 0 && currentTermuxInstallTime != savedTermuxSignature)) {
+            internalPrefs.edit()
+                    .putBoolean("termux_tapped_overlay", false)
+                    .putBoolean("termux_tapped_storage", false)
+                    .putLong("termux_install_signature", isTermuxInstalled ? currentTermuxInstallTime : 0)
+                    .apply();
+        } else if (isTermuxInstalled && savedTermuxSignature == 0) {
+            // First time tracking an existing installation
+            internalPrefs.edit().putLong("termux_install_signature", currentTermuxInstallTime).apply();
+        }
+
+        // 2. Calculate Termux missing permissions (Blue Badge)
+        int missingTermux = 0;
+
+        // We read the flags (they will automatically return false if they were just wiped by the logic above)
+        if (!internalPrefs.getBoolean("termux_tapped_overlay", false)) missingTermux++;
+        if (!internalPrefs.getBoolean("termux_tapped_storage", false)) missingTermux++;
+
+        if (badgeTermux != null) {
+            if (missingTermux > 0) {
+                badgeTermux.setVisibility(View.VISIBLE);
+                badgeTermux.setText(String.valueOf(missingTermux));
+            } else {
+                badgeTermux.setVisibility(View.GONE);
+            }
         }
     }
 }

@@ -485,37 +485,59 @@ public class DashboardFragment extends Fragment {
         }
     }
 
-    // The 5 possible system states
     // --- MASTER STATE EVALUATOR ---
     private SystemState evaluateSystemState(boolean isNginxAlive) {
 
         // 1. Does Termux physically exist on the Android device?
         boolean isTermuxInstalled = false;
+        long currentTermuxInstallTime = 0;
+
         try {
-            requireContext().getPackageManager().getPackageInfo("com.termux", 0);
+            android.content.pm.PackageInfo info = requireContext().getPackageManager().getPackageInfo("com.termux", 0);
             isTermuxInstalled = true;
+            currentTermuxInstallTime = info.firstInstallTime; // This is our secure signature!
         } catch (PackageManager.NameNotFoundException e) {
             isTermuxInstalled = false;
         }
 
         File stateDir = new File(Environment.getExternalStorageDirectory(), ".iiab_state");
+        android.content.SharedPreferences prefs = requireContext().getSharedPreferences("iiab_internal_prefs", Context.MODE_PRIVATE);
+        long savedTermuxSignature = prefs.getLong("termux_install_signature", 0);
 
-        // Ghost Handling: If Termux is uninstalled, clean up and reset cache.
-        if (!isTermuxInstalled) {
+        // --- THE PURGE: Ghost Handling & Signature Verification ---
+        // If Termux is NOT installed, OR if it IS installed but the signature doesn't match (meaning it was reinstalled)
+        if (!isTermuxInstalled || (savedTermuxSignature != 0 && currentTermuxInstallTime != savedTermuxSignature)) {
+
             isArchCalculated = false;
             if (stateDir.exists()) {
                 deleteRecursive(stateDir);
             }
-            return SystemState.NONE;
+
+            if (!isTermuxInstalled) {
+                // Termux is completely gone. Reset our signature memory to 0.
+                prefs.edit().putLong("termux_install_signature", 0).apply();
+                return SystemState.NONE;
+            } else {
+                // Termux was REINSTALLED. Save the new signature so we don't purge it again.
+                prefs.edit().putLong("termux_install_signature", currentTermuxInstallTime).apply();
+
+                // IMPORTANT: Here we need to reset the variables that track if the user clicked
+                // the "Display over other apps" and "Storage" menus.
+                // prefs.edit().putBoolean("termux_tapped_storage", false).apply();
+            }
+        } else if (isTermuxInstalled && savedTermuxSignature == 0) {
+            // First time we ever see Termux. Save its signature.
+            prefs.edit().putLong("termux_install_signature", currentTermuxInstallTime).apply();
         }
 
-        if (!isArchCalculated) {
+        // --- THE TRIGGER ---
+        if (!isArchCalculated && isTermuxInstalled) {
             cachedTermuxArch = getTermuxArch();
             cachedDebianArch = getDebianArch(cachedTermuxArch);
             isArchCalculated = true;
         }
 
-        // 2. Does the Nginx server respond? (The network doesn't lie)
+        // 2. Does the Nginx server respond?
         if (isNginxAlive) {
             return SystemState.ONLINE;
         }
@@ -523,10 +545,10 @@ public class DashboardFragment extends Fragment {
         // 3. Is IIAB fully compiled/restored and ready?
         File flagIiabReady = new File(stateDir, "flag_iiab_ready");
         if (flagIiabReady.exists()) {
-            return SystemState.OFFLINE; // The real offline state
+            return SystemState.OFFLINE;
         }
 
-        // 4. Is the base Debian OS installed, but NO IIAB yet? (The Virgin Debian Trap)
+        // 4. Is the base Debian OS installed, but NO IIAB yet?
         File flagSystem = new File(stateDir, "flag_system_installed");
         if (flagSystem.exists()) {
             return SystemState.DEBIAN_ONLY;

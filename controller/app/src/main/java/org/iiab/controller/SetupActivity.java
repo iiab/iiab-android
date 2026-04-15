@@ -195,6 +195,9 @@ public class SetupActivity extends AppCompatActivity {
         // Direct access to Termux Overlay permissions
         btnTermuxOverlay.setOnClickListener(v -> {
             try {
+                SharedPreferences internalPrefs = getSharedPreferences(getString(R.string.pref_file_internal), Context.MODE_PRIVATE);
+                internalPrefs.edit().putBoolean("termux_tapped_overlay", true).apply();
+
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
                 intent.setData(Uri.parse("package:com.termux"));
                 startActivity(intent);
@@ -206,6 +209,9 @@ public class SetupActivity extends AppCompatActivity {
         // Direct access to Termux settings to grant Files/Storage permission
         btnTermuxStorage.setOnClickListener(v -> {
             try {
+                SharedPreferences internalPrefs = getSharedPreferences(getString(R.string.pref_file_internal), Context.MODE_PRIVATE);
+                internalPrefs.edit().putBoolean("termux_tapped_storage", true).apply();
+
                 Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                 intent.setData(Uri.parse("package:com.termux"));
                 startActivity(intent);
