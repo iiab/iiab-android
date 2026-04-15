@@ -445,10 +445,10 @@ attempt_auto_apply_ppk() {
 }
 
 run_barebones_logic() {
+  step_termux_base || baseline_bail
   power_mode_offer_battery_settings_once || true
   power_mode_offer_overlay_settings_once || true
   repo_selector_ask_configure
-  step_termux_base || baseline_bail
   boxyproxy_install_or_update || true
 }
 
@@ -512,10 +512,10 @@ main() {
 
     baseline)
       offer_welcome_once "Baseline"
+      step_termux_base || baseline_bail
       power_mode_offer_battery_settings_once || true
       power_mode_offer_overlay_settings_once || true
       repo_selector_ask_configure
-      step_termux_base || baseline_bail
       boxyproxy_install_or_update || true
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
@@ -524,10 +524,10 @@ main() {
 
     with-adb)
       offer_welcome_once "With ADB"
+      step_termux_base || baseline_bail
       power_mode_offer_battery_settings_once || true
       power_mode_offer_overlay_settings_once || true
       repo_selector_ask_configure
-      step_termux_base || baseline_bail
       boxyproxy_install_or_update || true
       step_iiab_bootstrap_default
       install_iiab_android_cmd || true
@@ -566,10 +566,10 @@ main() {
 
     iiab-android)
       offer_welcome_once "IIAB Android"
+      step_termux_base || baseline_bail
       power_mode_offer_battery_settings_once || true
       power_mode_offer_overlay_settings_once || true
       repo_selector_ask_configure
-      step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       boxyproxy_install_or_update || true
       install_iiab_android_cmd || true
@@ -584,10 +584,10 @@ main() {
 
     all)
       offer_welcome_once "All - Full Setup"
+      step_termux_base || baseline_bail
       power_mode_offer_battery_settings_once || true
       power_mode_offer_overlay_settings_once || true
       repo_selector_ask_configure
-      step_termux_base || baseline_bail
       step_iiab_bootstrap_default
       boxyproxy_install_or_update || true
       boxyproxy_start || true

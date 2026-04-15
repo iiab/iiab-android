@@ -576,15 +576,23 @@ step_termux_base() {
     have termux-reload-settings && termux-reload-settings || true
   fi
 
-  if [[ ! -d "${HOME}/storage/shared" ]]; then
+  # Test if the APK already granted us real Android storage access
+  if touch /sdcard/.iiab_storage_test 2>/dev/null; then
+    rm -f /sdcard/.iiab_storage_test
+
+    # We have access! Just ensure the Termux symlinks exist silently.
+    if [[ ! -d "${HOME}/storage/shared" ]]; then
+      termux-setup-storage
+      sleep 1 # Give it a second to create symlinks
+    fi
+    ok "Storage access already granted (Managed by IIAB Controller)."
+  else
     log_yel "Termux needs storage access to communicate with the IIAB Controller App."
     warn "An Android permission dialog will appear."
     warn "Please tap 'Allow' (or 'All files access')."
     termux-setup-storage
     # termux-setup-storage is asynchronous, so we must pause to let the user tap 'Allow'
-    countdown_timer 10 "\r${BLU}[iiab]${RST} Waiting for user to grant storage permission... %d secs "
-  else
-    ok "Storage access already granted."
+    countdown_timer 10 "\r${BLU}[iiab]${RST} Waiting for storage permission... %d secs "
   fi
 
   log "Updating Termux packages (noninteractive) and installing baseline dependencies..."
