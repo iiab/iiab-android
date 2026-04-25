@@ -43,6 +43,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/wifi"
+                    android:fontFamily="@font/orbitron"
                     android:textColor="@color/dash_text_primary"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -68,6 +69,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/hotspot"
+                    android:fontFamily="@font/orbitron"
                     android:textColor="@color/dash_text_primary"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -110,7 +112,8 @@
             android:textColor="#FFFFFF"
             android:background="@drawable/rounded_button"
             android:backgroundTint="@color/btn_vpn_off"
-            android:textAllCaps="false" />
+            android:textAllCaps="false"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/control_description"
@@ -122,7 +125,8 @@
             android:gravity="center"
             android:textColor="?android:attr/textColorSecondary"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="12dp"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/btnBrowseContent"
@@ -155,7 +159,8 @@
             android:paddingHorizontal="0dp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/config_layout"
@@ -486,7 +491,7 @@
             android:layout_height="250dp"
             android:background="#000000"
             android:textColor="#00FF00"
-            android:fontFamily="monospace"
+            android:fontFamily="@font/orbitron"
             android:padding="8dp"
             android:visibility="gone"
             android:scrollbars="vertical"
@@ -494,7 +499,7 @@
             android:scrollbarSize="10dp"
             android:scrollbarThumbVertical="@drawable/scrollbar_thumb"
             android:text="@string/system_ready"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
 
         <TextView
             android:id="@+id/log_size_text"

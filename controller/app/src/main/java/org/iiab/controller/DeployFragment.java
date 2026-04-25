@@ -90,6 +90,8 @@ public class DeployFragment extends Fragment {
     private static final String TAG = "IIAB-DeployFragment";
     private List<String> installationQueue = new ArrayList<>();
     private boolean isBatchInstalling = false;
+    private final Handler liveStatusHandler = new Handler(Looper.getMainLooper());
+    private Runnable liveStatusRunnable;
     // -- Advance monitoring --
     private Button btnAdbAction;
     private View ledAdbStatus;
@@ -224,7 +226,8 @@ public class DeployFragment extends Fragment {
         }
 
         // 3. ASSIGN TEXT LISTENERS
-        txtDcpr.setOnClickListener(v -> {
+        LinearLayout containerDcpr = view.findViewById(R.id.container_led_dcpr);
+        containerDcpr.setOnClickListener(v -> {
             if (isConnectedToAdb && android.os.Build.VERSION.SDK_INT >= 34) {
                 IIABAdbManager adbManager = IIABAdbManager.getInstance(requireContext());
                 adbManager.executeCommand("settings put global settings_enable_monitor_phantom_procs 0");
@@ -234,7 +237,8 @@ public class DeployFragment extends Fragment {
         });
 
         // Listener to set PPK to 256 (Android 12+)
-        txtPpk.setOnClickListener(v -> {
+        LinearLayout containerPpk = view.findViewById(R.id.container_led_ppk);
+        containerPpk.setOnClickListener(v -> {
             if (isConnectedToAdb && android.os.Build.VERSION.SDK_INT >= 31) {
                 IIABAdbManager adbManager = IIABAdbManager.getInstance(requireContext());
                 adbManager.executeCommand("device_config put activity_manager max_phantom_processes 256");
@@ -286,6 +290,21 @@ public class DeployFragment extends Fragment {
         setupAllCollapsibleMenus();
         createModulesGrid();
         requestFreshLocalVarsSilently();
+
+        // Define the heartbeat (checks the server in the background)
+        liveStatusRunnable = () -> {
+            new Thread(() -> {
+                boolean isAlive = pingUrl("http://localhost:8085/home");
+                if (getActivity() instanceof MainActivity) {
+                    ((MainActivity) getActivity()).isServerAlive = isAlive;
+                }
+                if (isAdded() && getActivity() != null) {
+                    getActivity().runOnUiThread(this::updateDynamicButtons);
+                }
+            }).start();
+            // Check every 3 seconds
+            liveStatusHandler.postDelayed(liveStatusRunnable, 3000);
+        };
     }
 
     @Override
@@ -333,6 +352,7 @@ public class DeployFragment extends Fragment {
             }
         }
         updateDynamicButtons();
+        liveStatusHandler.post(liveStatusRunnable);
     }
 
     @Override
@@ -342,6 +362,7 @@ public class DeployFragment extends Fragment {
             requireContext().unregisterReceiver(adbUiUpdateReceiver);
         } catch (Exception ignored) {
         }
+        liveStatusHandler.removeCallbacks(liveStatusRunnable);
     }
 
     private void setupAllCollapsibleMenus() {
@@ -354,6 +375,7 @@ public class DeployFragment extends Fragment {
         // 3. Maintenance
         TextView txtMaintenanceTitle = getView().findViewById(R.id.txt_maintenance_title);
         LinearLayout containerMaintenance = getView().findViewById(R.id.container_maintenance);
+        setupSingleMenu(txtMaintenanceTitle, containerMaintenance, R.string.install_header_maintenance);
     }
 
     private void setupSingleMenu(TextView titleView, View container, int stringRes) {
@@ -840,6 +862,21 @@ public class DeployFragment extends Fragment {
 
         refreshDashboardLeds(mainAct);
 
+        // LOGIC OF THE ANIMATED BANNER
+        View bannerWarning = getView().findViewById(R.id.banner_server_warning);
+        if (bannerWarning != null) {
+            boolean isBannerVisible = bannerWarning.getVisibility() == View.VISIBLE;
+
+            // Animate only if there is a real state change to prevent screen flashing.
+            if (isServerRunning && !isBannerVisible) {
+                android.transition.TransitionManager.beginDelayedTransition((ViewGroup) getView(), new android.transition.AutoTransition().setDuration(300));
+                bannerWarning.setVisibility(View.VISIBLE);
+            } else if (!isServerRunning && isBannerVisible) {
+                android.transition.TransitionManager.beginDelayedTransition((ViewGroup) getView(), new android.transition.AutoTransition().setDuration(300));
+                bannerWarning.setVisibility(View.GONE);
+            }
+        }
+
         // --- REFRESH BUTTON LOGIC ---
         if (btnRefreshModules != null) {
             btnRefreshModules.setEnabled(true);
@@ -1167,11 +1204,6 @@ public class DeployFragment extends Fragment {
             android.util.Log.e(TAG, "Could not check Developer Mode status", e);
         }
         ledDevMode.setBackgroundResource(isDevModeOn ? R.drawable.led_on_green : R.drawable.led_off);
-
-        // 3. DCPR and PPK LEDs: These depend on ADB.
-        // Left OFF for now, waiting for future ADB service.
-        ledDcpr.setBackgroundResource(R.drawable.led_off);
-        ledPpk.setBackgroundResource(R.drawable.led_off);
     }
 
     // =========================================================================

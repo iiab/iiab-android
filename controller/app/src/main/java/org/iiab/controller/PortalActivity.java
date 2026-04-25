@@ -124,6 +124,7 @@ public class PortalActivity extends AppCompatActivity {
                 // Disable cache temporarily
                 webView.getSettings().setCacheMode(android.webkit.WebSettings.LOAD_NO_CACHE);
                 // Force download from scratch
+                webView.clearCache(true);
                 webView.reload();
             }
             resetTimer.run();

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -40,13 +41,22 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/outline_android_wifi_3_bar_24"
+                        app:tint="#888888"
+                        android:layout_marginEnd="6dp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Wi-Fi: "
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:textColor="#888888"
+                        android:textSize="13sp" />
 
                     <TextView
                         android:id="@+id/dash_text_wifi_ip"
@@ -54,6 +64,8 @@
                         android:layout_height="wrap_content"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textStyle="bold"
+                        android:fontFamily="@font/orbitron"
+                        android:textSize="11.5sp"
                         tools:text="192.168.1.158" />
                 </LinearLayout>
 
@@ -61,13 +73,22 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/outline_connect_without_contact_24"
+                        app:tint="#888888"
+                        android:layout_marginEnd="6dp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Hotspot: "
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:textColor="#888888"
+                        android:textSize="13sp" />
 
                     <TextView
                         android:id="@+id/dash_text_hotspot_ip"
@@ -75,6 +96,8 @@
                         android:layout_height="wrap_content"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textStyle="bold"
+                        android:fontFamily="@font/orbitron"
+                        android:textSize="11.5sp"
                         tools:text="--" />
                 </LinearLayout>
             </LinearLayout>
@@ -89,13 +112,22 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/outline_clock_arrow_up_24"
+                        app:tint="#888888"
+                        android:layout_marginEnd="6dp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Uptime: "
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:textColor="#888888"
+                        android:textSize="13sp" />
 
                     <TextView
                         android:id="@+id/dash_text_uptime"
@@ -103,6 +135,8 @@
                         android:layout_height="wrap_content"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textStyle="bold"
+                        android:fontFamily="@font/orbitron"
+                        android:textSize="11.5sp"
                         tools:text="9d 06h 34m" />
                 </LinearLayout>
 
@@ -110,13 +144,22 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/outline_battery_4_bar_24"
+                        app:tint="#888888"
+                        android:layout_marginEnd="6dp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Battery: "
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:textColor="#888888"
+                        android:textSize="13sp" />
 
                     <TextView
                         android:id="@+id/dash_text_battery"
@@ -124,6 +167,8 @@
                         android:layout_height="wrap_content"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textStyle="bold"
+                        android:fontFamily="@font/orbitron"
+                        android:textSize="11.5sp"
                         tools:text="100%" />
                 </LinearLayout>
             </LinearLayout>
@@ -132,120 +177,45 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:background="@color/dash_divider"
-                android:layout_marginBottom="16dp" />
+                android:layout_marginBottom="12dp" />
 
             <LinearLayout
+                android:id="@+id/dash_gauges_root"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:orientation="vertical"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_marginBottom="4dp">
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/dash_main_storage"
-                    android:textStyle="bold"
-                    android:textColor="@color/dash_text_primary" />
-
-                <TextView
-                    android:id="@+id/dash_text_storage"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="-- GB / -- GB"
-                    android:textColor="@color/dash_text_secondary"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <ProgressBar
-                android:id="@+id/dash_progress_storage"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="12dp"
-                android:progressDrawable="@drawable/rounded_progress_bar"
-                android:progressTint="@color/dash_bar_storage"
-                android:progressBackgroundTint="@color/dash_bar_bg"
-                android:progress="0"
-                android:layout_marginBottom="16dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:baselineAligned="false">
+                <org.iiab.controller.ResourceGaugeView
+                    android:id="@+id/gauge_storage"
+                    android:layout_width="225dp"
+                    android:layout_height="225dp"
+                    android:layout_gravity="center"
+                    android:layout_marginBottom="4dp" />
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:id="@+id/dash_gauges_bottom_row"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginEnd="8dp">
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="0dp">
 
-                    <TextView
-                        android:layout_width="match_parent"
+                    <org.iiab.controller.ResourceGaugeView
+                        android:id="@+id/gauge_ram"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/dash_ram_memory"
-                        android:textColor="@color/dash_text_primary"
-                        android:textStyle="bold"
-                        android:maxLines="1" />
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1" />
 
-                    <TextView
-                        android:id="@+id/dash_text_ram"
-                        android:layout_width="match_parent"
+                    <org.iiab.controller.ResourceGaugeView
+                        android:id="@+id/gauge_swap"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="-- / --"
-                        android:textColor="@color/dash_text_secondary"
-                        android:textSize="12sp"
-                        android:gravity="end"
-                        android:layout_marginTop="2dp" />
-
-                    <ProgressBar
-                        android:id="@+id/dash_progress_ram"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="8dp"
-                        android:layout_marginTop="4dp"
-                        android:progressDrawable="@drawable/rounded_progress_bar"
-                        android:progressTint="@color/dash_bar_ram"
-                        android:progressBackgroundTint="@color/dash_bar_bg"
-                        android:progress="0" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="8dp">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/dash_swap_virtual"
-                        android:textColor="@color/dash_text_primary"
-                        android:textStyle="bold"
-                        android:maxLines="1" />
-
-                    <TextView
-                        android:id="@+id/dash_text_swap"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="-- / --"
-                        android:textColor="@color/dash_text_secondary"
-                        android:textSize="12sp"
-                        android:gravity="end"
-                        android:layout_marginTop="2dp" />
-
-                    <ProgressBar
-                        android:id="@+id/dash_progress_swap"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="8dp"
-                        android:layout_marginTop="4dp"
-                        android:progressDrawable="@drawable/rounded_progress_bar"
-                        android:progressTint="@color/dash_bar_swap"
-                        android:progressBackgroundTint="@color/dash_bar_bg"
-                        android:progress="0" />
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
@@ -292,7 +262,8 @@
                     android:background="@drawable/rounded_button"
                     android:backgroundTint="#555555"
                     android:textColor="@color/dash_text_primary"
-                    android:textSize="12sp"
+                    android:fontFamily="@font/orbitron"
+                    android:textSize="11sp"
                     android:textStyle="bold"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="4dp" />
@@ -375,6 +346,7 @@
                             android:textSize="12sp"
                             android:textStyle="bold"
                             android:textColor="?android:attr/textColorPrimary"
+                            android:fontFamily="@font/orbitron"
                             tools:text="arm64-v8a" />
                     </LinearLayout>
 
@@ -398,6 +370,7 @@
                             android:textSize="12sp"
                             android:textStyle="bold"
                             android:textColor="?android:attr/textColorPrimary"
+                            android:fontFamily="@font/orbitron"
                             tools:text="arm64" />
                     </LinearLayout>
                 </LinearLayout>

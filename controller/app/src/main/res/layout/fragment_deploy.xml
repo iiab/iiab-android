@@ -18,7 +18,8 @@
             android:backgroundTint="@color/dash_module_bg"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
-            android:paddingTop="16dp"  android:paddingBottom="10dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="10dp"
             android:layout_marginBottom="16dp"
             android:gravity="top"
             android:baselineAligned="false"
@@ -30,18 +31,21 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center">
+
                 <View
                     android:id="@+id/led_install_termux"
                     android:layout_width="10dp"
                     android:layout_height="10dp"
                     android:background="@drawable/led_off"
                     android:layout_marginBottom="4dp" />
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/install_led_termux"
                     android:textColor="#FFFFFF"
-                    android:textSize="10sp"
+                    android:fontFamily="@font/orbitron"
+                    android:textSize="9sp"
                     android:gravity="center"
                     android:lines="2" />
             </LinearLayout>
@@ -52,18 +56,21 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center">
+
                 <View
                     android:id="@+id/led_install_dev_mode"
                     android:layout_width="10dp"
                     android:layout_height="10dp"
                     android:background="@drawable/led_off"
                     android:layout_marginBottom="4dp" />
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/install_led_dev_options"
                     android:textColor="#FFFFFF"
-                    android:textSize="10sp"
+                    android:fontFamily="@font/orbitron"
+                    android:textSize="9sp"
                     android:gravity="center"
                     android:lines="2" />
             </LinearLayout>
@@ -74,20 +81,26 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:gravity="center"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
                 <View
                     android:id="@+id/led_install_dcpr"
                     android:layout_width="10dp"
                     android:layout_height="10dp"
                     android:background="@drawable/led_off"
                     android:layout_marginBottom="4dp" />
+
                 <TextView
                     android:id="@+id/txt_install_dcpr"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/install_led_child_process"
                     android:textColor="@color/dash_text_secondary"
-                    android:textSize="10sp"
+                    android:fontFamily="@font/orbitron"
+                    android:textSize="9sp"
                     android:gravity="center"
                     android:lines="2" />
             </LinearLayout>
@@ -98,23 +111,59 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:gravity="center"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
                 <View
                     android:id="@+id/led_install_ppk"
                     android:layout_width="10dp"
                     android:layout_height="10dp"
                     android:background="@drawable/led_off"
                     android:layout_marginBottom="4dp" />
+
                 <TextView
                     android:id="@+id/txt_install_ppk"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/install_led_ppk"
                     android:textColor="@color/dash_text_secondary"
-                    android:textSize="10sp"
+                    android:fontFamily="@font/orbitron"
+                    android:textSize="9sp"
                     android:gravity="center"
                     android:lines="2" />
             </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/banner_server_warning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@drawable/rounded_button"
+            android:backgroundTint="#FFF3E0"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚠️"
+                android:textSize="16sp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/install_warning_server_running"
+                android:textColor="#E65100"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -221,7 +270,7 @@
                         android:textSize="12sp"
                         android:textStyle="bold"
                         android:layout_marginBottom="8dp"
-                        android:layout_marginStart="8dp"/>
+                        android:layout_marginStart="8dp" />
 
                     <com.github.mikephil.charting.charts.LineChart
                         android:id="@+id/cpu_chart"
@@ -348,8 +397,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginBottom="8dp">
-            </LinearLayout>
+                android:layout_marginBottom="8dp"></LinearLayout>
 
             <LinearLayout
                 android:id="@+id/install_discrepancy_warning"
@@ -401,8 +449,13 @@
             android:textColor="?android:attr/textColorPrimary"
             android:textStyle="bold"
             android:textSize="18sp"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:paddingVertical="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
@@ -414,7 +467,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:visibility="visible">
+            android:visibility="gone">
 
             <TextView
                 android:layout_width="match_parent"

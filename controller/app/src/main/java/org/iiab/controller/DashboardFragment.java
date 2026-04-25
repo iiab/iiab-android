@@ -46,14 +46,15 @@ import java.util.Locale;
 public class DashboardFragment extends Fragment {
 
     private TextView txtDeviceName;
-    private TextView txtWifiIp, txtHotspotIp, txtUptime, txtBattery, badgeStatus, txtStorage, txtRam, txtSwap, txtTermuxState;
+    private TextView txtWifiIp, txtHotspotIp, txtUptime, txtBattery, badgeStatus, txtTermuxState;
+    private ResourceGaugeView gaugeStorage, gaugeRam, gaugeSwap;
+    private LinearLayout rootGauges, bottomRowGauges;
     private TextView txtTermuxArch, txtDebianArch;
     private LinearLayout archContainer;
     private String cachedTermuxArch = null;
     private String cachedDebianArch = null;
     private boolean isArchCalculated = false;
     private TextView modulesTitle;
-    private ProgressBar progStorage, progRam, progSwap;
     private View ledTermuxState;
     private LinearLayout modulesContainer;
 
@@ -108,12 +109,32 @@ public class DashboardFragment extends Fragment {
         txtBattery = view.findViewById(R.id.dash_text_battery);
         badgeStatus = view.findViewById(R.id.dash_badge_status);
 
-        txtStorage = view.findViewById(R.id.dash_text_storage);
-        txtRam = view.findViewById(R.id.dash_text_ram);
-        txtSwap = view.findViewById(R.id.dash_text_swap);
-        progStorage = view.findViewById(R.id.dash_progress_storage);
-        progRam = view.findViewById(R.id.dash_progress_ram);
-        progSwap = view.findViewById(R.id.dash_progress_swap);
+        gaugeStorage = view.findViewById(R.id.gauge_storage);
+        gaugeRam = view.findViewById(R.id.gauge_ram);
+        gaugeSwap = view.findViewById(R.id.gauge_swap);
+
+        rootGauges = view.findViewById(R.id.dash_gauges_root);
+        bottomRowGauges = view.findViewById(R.id.dash_gauges_bottom_row);
+
+        // INDIVIDUAL ANIMATION (Only for gauges)
+        View.OnClickListener animateIndividualClick = v -> {
+            if (v instanceof ResourceGaugeView) {
+                ((ResourceGaugeView) v).triggerAnimation();
+            }
+        };
+        gaugeStorage.setOnClickListener(animateIndividualClick);
+        gaugeRam.setOnClickListener(animateIndividualClick);
+        gaugeSwap.setOnClickListener(animateIndividualClick);
+
+        // GROUP ANIMATION (Only when touching the background/empty space)
+        View.OnClickListener animateAllClick = v -> {
+            if (gaugeStorage != null) gaugeStorage.triggerAnimation();
+            if (gaugeRam != null) gaugeRam.triggerAnimation();
+            if (gaugeSwap != null) gaugeSwap.triggerAnimation();
+        };
+        rootGauges.setOnClickListener(animateAllClick);
+        bottomRowGauges.setOnClickListener(animateAllClick);
+        adaptLayoutToOrientation(getResources().getConfiguration().orientation);
 
         ledTermuxState = view.findViewById(R.id.led_termux_state);
         txtTermuxState = view.findViewById(R.id.text_termux_state);
@@ -151,6 +172,12 @@ public class DashboardFragment extends Fragment {
     public void onResume() {
         super.onResume();
         refreshHandler.post(refreshRunnable);
+        // TRIGGER ANIMATION WHEN ENTERING TAB
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (gaugeStorage != null) gaugeStorage.triggerAnimation();
+            if (gaugeRam != null) gaugeRam.triggerAnimation();
+            if (gaugeSwap != null) gaugeSwap.triggerAnimation();
+        }, 100);
     }
 
     @Override
@@ -210,27 +237,37 @@ public class DashboardFragment extends Fragment {
         double swapUsedGb = (swapTotal - swapFree) / 1048576.0;
         int swapProgress = swapTotal > 0 ? (int) (((swapTotal - swapFree) * 100) / swapTotal) : 0;
 
-        // --- UPDATE UI (TEXT AND BARS) ---
-        txtRam.setText(String.format(Locale.US, "%.2f GB / %.2f GB", memUsedGb, memTotalGb));
-        progRam.setProgress(memProgress);
-
-        if (swapTotal > 0) {
-            txtSwap.setText(String.format(Locale.US, "%.2f GB / %.2f GB", swapUsedGb, swapTotalGb));
-            progSwap.setProgress(swapProgress);
-        } else {
-            // If the device does not use Swap
-            txtSwap.setText("-- / --");
-            progSwap.setProgress(0);
-        }
-
-        // 2. Get Internal Storage
         File path = android.os.Environment.getDataDirectory();
         long totalSpace = path.getTotalSpace() / (1024 * 1024 * 1024); // To GB
         long freeSpace = path.getFreeSpace() / (1024 * 1024 * 1024);
         long usedSpace = totalSpace - freeSpace;
 
-        txtStorage.setText(usedSpace + " GB / " + totalSpace + " GB");
-        progStorage.setProgress(totalSpace > 0 ? (int) ((usedSpace * 100) / totalSpace) : 0);
+        // --- UPDATE GAUGE VIEWS (ANIMATED AND COLORED) ---
+        int colorRam = ContextCompat.getColor(requireContext(), R.color.dash_bar_ram);
+        int colorSwap = ContextCompat.getColor(requireContext(), R.color.dash_bar_swap);
+        int colorStorage = ContextCompat.getColor(requireContext(), R.color.dash_bar_storage);
+
+        // RAM Gauge
+        String strRam = String.format(Locale.US, "%.2f GB / %.2f GB", memUsedGb, memTotalGb);
+        if (gaugeRam != null)
+            gaugeRam.updateData(memProgress, strRam, getString(R.string.dash_ram_memory), colorRam);
+
+        // SWAP Gauge
+        if (gaugeSwap != null) {
+            if (swapTotal > 0) {
+                String strSwap = String.format(Locale.US, "%.2f GB / %.2f GB", swapUsedGb, swapTotalGb);
+                gaugeSwap.updateData(swapProgress, strSwap, getString(R.string.dash_swap_virtual), colorSwap);
+            } else {
+                gaugeSwap.updateData(0, "-- / --", getString(R.string.dash_swap_virtual), colorSwap);
+            }
+        }
+
+        // STORAGE Gauge
+        if (gaugeStorage != null) {
+            String strStorage = usedSpace + " GB / " + totalSpace + " GB";
+            int storageProgress = totalSpace > 0 ? (int) ((usedSpace * 100f) / totalSpace) : 0;
+            gaugeStorage.updateData(storageProgress, strStorage, getString(R.string.dash_main_storage), colorStorage);
+        }
     }
 
     private void createModuleViews() {
@@ -638,5 +675,73 @@ public class DashboardFragment extends Fragment {
         if (lower.contains("armeabi") || lower.contains("armv7")) return "armhf";
 
         return lower;
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // When the user rotates the screen, we dynamically rearrange the layout
+        adaptLayoutToOrientation(newConfig.orientation);
+    }
+
+    private void adaptLayoutToOrientation(int orientation) {
+        if (rootGauges == null || bottomRowGauges == null) return;
+
+        if (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            // ==========================================
+            // LANDSCAPE MODE (1 Horizontal Row)
+            // ==========================================
+            rootGauges.setOrientation(LinearLayout.HORIZONTAL);
+
+            if (gaugeRam.getParent() == bottomRowGauges) bottomRowGauges.removeView(gaugeRam);
+            if (gaugeSwap.getParent() == bottomRowGauges) bottomRowGauges.removeView(gaugeSwap);
+
+            if (gaugeRam.getParent() == null) rootGauges.addView(gaugeRam);
+            if (gaugeSwap.getParent() == null) rootGauges.addView(gaugeSwap);
+
+            bottomRowGauges.setVisibility(View.GONE);
+
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dpToPx(180), 1f);
+            params.gravity = android.view.Gravity.CENTER;
+
+            gaugeStorage.setLayoutParams(params);
+            gaugeRam.setLayoutParams(params);
+            gaugeSwap.setLayoutParams(params);
+
+        } else {
+            // ==========================================
+            // PORTRAIT MODE (Triangle: 1 Up, 2 Down)
+            // ==========================================
+            rootGauges.setOrientation(LinearLayout.VERTICAL);
+
+            if (gaugeRam.getParent() == rootGauges) rootGauges.removeView(gaugeRam);
+            if (gaugeSwap.getParent() == rootGauges) rootGauges.removeView(gaugeSwap);
+
+            if (gaugeRam.getParent() == null) bottomRowGauges.addView(gaugeRam);
+            if (gaugeSwap.getParent() == null) bottomRowGauges.addView(gaugeSwap);
+
+            bottomRowGauges.setVisibility(View.VISIBLE);
+
+            // Large, centered Storage gauge
+            LinearLayout.LayoutParams storageParams = new LinearLayout.LayoutParams(dpToPx(225), dpToPx(225), 0);
+            storageParams.gravity = android.view.Gravity.CENTER;
+            storageParams.bottomMargin = dpToPx(4);
+            gaugeStorage.setLayoutParams(storageParams);
+
+            // Dynamic RAM and SWAP (50% width each) to prevent clipping
+            LinearLayout.LayoutParams ramParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            ramParams.rightMargin = dpToPx(8);
+
+            LinearLayout.LayoutParams swapParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            swapParams.leftMargin = dpToPx(8);
+
+            gaugeRam.setLayoutParams(ramParams);
+            gaugeSwap.setLayoutParams(swapParams);
+        }
+    }
+
+    // Converter from DP to actual screen pixels
+    private int dpToPx(int dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density);
     }
 }

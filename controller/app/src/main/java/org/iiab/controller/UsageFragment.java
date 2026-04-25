@@ -292,11 +292,15 @@ public class UsageFragment extends Fragment implements View.OnClickListener {
             button_browse_content.setTextColor(Color.WHITE);
             button_browse_content.setBackgroundTintList(ContextCompat.getColorStateList(requireContext(), R.color.btn_explore_ready));
 
-            if (isVpnActive && !mainActivity.isProxyDegraded) {
-                button_browse_content.setAlpha(1.0f);
-            } else {
-                button_browse_content.setAlpha(0.6f);
-            }
+            // TODO: [RESTORE] Uncomment original logic to tie Explore button to ESPW/VPN status
+            // if (isVpnActive && !mainActivity.isProxyDegraded) {
+            //     button_browse_content.setAlpha(1.0f);
+            // } else {
+            //     button_browse_content.setAlpha(0.6f);
+            // }
+
+            // TEMP BYPASS: Always fully opaque when server is running
+            button_browse_content.setAlpha(1.0f);
         }
 
 // Server Control Logic

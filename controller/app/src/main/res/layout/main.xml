@@ -108,12 +108,15 @@
         android:layout_height="wrap_content"
         app:tabMode="fixed"
         app:tabGravity="fill"
-        app:tabIndicatorColor="#FFFFFF"
-        app:tabIndicatorHeight="3dp"
-        app:tabSelectedTextColor="#FFFFFF"
-        app:tabTextColor="#888888"
+        app:tabMaxWidth="0dp"
+        android:background="#1A1A1A"
         app:tabTextAppearance="@style/CustomTabTextStyle"
-        android:background="#1A1A1A" />
+        app:tabTextColor="#888888"
+
+        app:tabSelectedTextColor="#00E5FF"
+        app:tabIndicatorColor="#00E5FF"
+        app:tabIndicatorHeight="4dp"
+        app:tabIndicatorFullWidth="true" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/view_pager"

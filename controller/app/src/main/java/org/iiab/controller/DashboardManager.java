@@ -107,8 +107,9 @@ public class DashboardManager {
         } else {
             // Morph back into 50% / 50% mode
             dashTunnel.setVisibility(View.GONE);
-            standaloneEspwButton.setVisibility(View.VISIBLE);
-            standaloneEspwDescription.setVisibility(View.VISIBLE);
+            // TODO: [RESTORE] Uncomment to show ESPW button again
+//            standaloneEspwButton.setVisibility(View.VISIBLE);
+//            standaloneEspwDescription.setVisibility(View.VISIBLE);
             // The LED turns off implicitly since the whole dash_tunnel hides, but we can enforce it:
             ledTunnel.setBackgroundResource(R.drawable.led_off);
             // Force recalculate

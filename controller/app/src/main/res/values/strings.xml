@@ -52,9 +52,9 @@
     <string name="dash_hotspot_format"><b>Hotspot:</b> %1$s</string>
     <string name="dash_uptime_format"><b>Uptime:</b> %1$s</string>
     <string name="dash_wifi_format"><b>Wi-Fi:</b> %1$s</string>
-    <string name="dash_main_storage">Main Storage</string>
-    <string name="dash_ram_memory">RAM Memory</string>
-    <string name="dash_swap_virtual">Swap (Virtual)</string>
+    <string name="dash_main_storage">Storage</string>
+    <string name="dash_ram_memory">RAM</string>
+    <string name="dash_swap_virtual">Swap</string>
 
     <string name="dash_server_status">Server Status:</string>
     <string name="dash_offline">Offline</string>
@@ -261,6 +261,7 @@
 
     <string name="install_header_maintenance">Maintenance &#38; Recovery</string>
     <string name="install_desc_maintenance">Perform system management tasks</string>
+    <string name="install_warning_server_running">Please turn off the server before using installation and maintenance tools.</string>
 
     <string name="install_btn_install">Install</string>
     <string name="install_btn_reinstall">Reinstall</string>
