@@ -14,16 +14,16 @@
     <Button
         android:id="@+id/btnHandle"
         android:layout_width="60dp"
-        android:layout_height="30dp"
+        android:layout_height="32dp"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:background="?android:attr/colorButtonNormal"
         android:alpha="0.8"
+        android:background="?android:attr/colorButtonNormal"
+        android:padding="0dp"
+        android:stateListAnimator="@null"
         android:text="⌃"
         android:textColor="?android:attr/textColorPrimary"
-        android:textSize="18sp"
-        android:padding="0dp"
-        android:stateListAnimator="@null" />
+        android:textSize="18sp" />
 
     <LinearLayout
         android:id="@+id/bottomNav"
