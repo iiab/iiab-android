@@ -394,6 +394,8 @@
     <string name="install_legend_maps">IIAB Maps</string>
     <string name="install_legend_kiwix">Wikipedia</string>
     <string name="install_legend_free">Free</string>
+    <string name="install_legend_wiki_plain">Wikipedia</string>
+    <string name="install_legend_wiki_lang">Wikipedia (%1$s)</string>
 
     <string name="rsync_error_binary_missing">Native rsync binary not found!</string>
     <string name="rsync_error_cancelled">Transfer cancelled by user.</string>
@@ -481,4 +483,10 @@
     <string name="qr_btn_close">Close</string>
     <string name="qr_content_description">QR Code</string>
     <string name="sync_share_status_init">Starting server...</string>
+
+    <string name="tutorial_share_title">Transfer vs. Access</string>
+    <string name="tutorial_share_heavy">Welcome to the Share section! Here you can clone the ENTIRE IIAB system (up to several GBs) to another device. This process can take hours, which is not the same as just Share Access that is instant.</string>
+    <string name="tutorial_share_light">Looking for instant access? ☝️\nIf you just want others to read Wikipedia or use Maps instantly, start the server and share the QR code up here!</string>
+    <string name="tutorial_share_dont_show">Do not show again</string>
+    <string name="tutorial_share_got_it">Got it!</string>
 </resources>

@@ -23,8 +23,9 @@
     <color name="divider_color">#E0E0E0</color>
     <color name="btn_danger">#D32F2F</color>
     <color name="btn_success">#388E3C</color>
-
+    <color name="btn_primary">#2196F3</color>
     <color name="dash_bar_storage">#4DB6AC</color>
+
     <color name="dash_bar_ram">#FFB300</color>
     <color name="dash_bar_swap">#7986CB</color>
     <color name="dash_bar_bg">#333333</color>
@@ -41,4 +42,8 @@
     <color name="dash_warning">#E65100</color>
     <color name="dash_status_online">#2E7D32</color>
 
-    <color name="footer_text_color">#5F6368</color> </resources>
+    <color name="footer_text_color">#5F6368</color>
+
+</resources>
+
+

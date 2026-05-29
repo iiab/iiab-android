@@ -307,6 +307,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }).attach();
 
+        // --- TUTORIAL TAB DETECTOR  ---
+        viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                super.onPageSelected(position);
+                if (position == 3) { // El índice 3 es la pestaña "Share"
+                    showShareTutorialIfNeeded();
+                }
+            }
+        });
+
         // --- START: EASTER EGG & OTA LOGIC ---
         versionFooter = findViewById(R.id.version_text);
         setVersionFooter();
@@ -2102,5 +2113,77 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Intent intent = new Intent(this, WatchdogService.class);
         intent.setAction(WatchdogService.ACTION_STOP);
         startService(intent);
+    }
+
+    // TUTORIAL OVERLAY LOGIC
+    private void showShareTutorialIfNeeded() {
+        SharedPreferences internalPrefs = getSharedPreferences(getString(R.string.pref_file_internal), Context.MODE_PRIVATE);
+        boolean hideTutorial = internalPrefs.getBoolean("hide_share_tutorial", false);
+
+        if (hideTutorial) return;
+
+        android.view.ViewGroup root = findViewById(android.R.id.content);
+        if (root.findViewById(R.id.tutorial_root) != null) return;
+
+        View tutorialView = getLayoutInflater().inflate(R.layout.overlay_tutorial_share, root, false);
+        root.addView(tutorialView);
+
+        // --- Clone QR BUTTON ---
+        ImageButton realBtn = findViewById(R.id.btn_share_qr);
+        android.widget.ImageView fakeBtn = tutorialView.findViewById(R.id.fake_share_btn);
+        View bubbleContainer = tutorialView.findViewById(R.id.bubble_light_container);
+
+        if (realBtn != null && fakeBtn != null) {
+            // We copy the icon you are currently using
+            fakeBtn.setImageDrawable(realBtn.getDrawable());
+
+            // We wait for the screen to finish drawing to obtain precise coordinates
+            tutorialView.post(() -> {
+                // 1. Obtain real coordinates by mitigating the Offset of the Status Bar
+                int[] rootLoc = new int[2];
+                tutorialView.getLocationInWindow(rootLoc);
+
+                int[] btnLoc = new int[2];
+                realBtn.getLocationInWindow(btnLoc);
+
+                float exactX = btnLoc[0] - rootLoc[0];
+                float exactY = btnLoc[1] - rootLoc[1];
+
+                // 2. Position the Clone Button
+                fakeBtn.setX(exactX);
+                fakeBtn.setY(exactY);
+                fakeBtn.getLayoutParams().width = realBtn.getWidth();
+                fakeBtn.getLayoutParams().height = realBtn.getHeight();
+                fakeBtn.requestLayout();
+
+                // 3. Align the needle EXACTLY to the center of the cloned button
+                View needle = tutorialView.findViewById(R.id.pointer_needle);
+                float needleX = exactX + (realBtn.getWidth() / 2f) - (needle.getWidth() / 2f);
+                float needleY = exactY + realBtn.getHeight() - (needle.getHeight() / 2f);
+                needle.setX(needleX);
+                needle.setY(needleY);
+
+                // 4. Position the blue bubble to align with the needle
+                bubbleContainer.setY(needleY + (needle.getHeight() / 2f) - 6);
+            });
+        }
+
+        // Entry animation
+        tutorialView.animate().alpha(1f).setDuration(400).start();
+
+        android.widget.Button btnGotIt = tutorialView.findViewById(R.id.btn_got_it);
+        android.widget.CheckBox chkDontShow = tutorialView.findViewById(R.id.chk_dont_show_again);
+
+        btnGotIt.setOnClickListener(v -> {
+            if (chkDontShow.isChecked()) {
+                internalPrefs.edit().putBoolean("hide_share_tutorial", true).apply();
+            }
+
+            tutorialView.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .withEndAction(() -> root.removeView(tutorialView))
+                    .start();
+        });
     }
 }

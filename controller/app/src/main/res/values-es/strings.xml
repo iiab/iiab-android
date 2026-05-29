@@ -229,6 +229,8 @@
     <string name="install_legend_maps">Mapas IIAB</string>
     <string name="install_legend_kiwix">Wikipedia</string>
     <string name="install_legend_free">Libre</string>
+    <string name="install_legend_wiki_plain">Wikipedia</string>
+    <string name="install_legend_wiki_lang">Wikipedia (%1$s)</string>
 
     <string name="install_msg_termux_missing">Por favor, instale primero el sistema base Debian.</string>
     <string name="install_adv_monitoring_title">Monitoreo avanzado</string>
@@ -468,4 +470,9 @@
     <string name="qr_btn_close">Cerrar</string>
     <string name="qr_content_description">Código QR</string>
     <string name="sync_share_status_init">Iniciando servidor...</string>
+
+    <string name="tutorial_share_title">Transferencia vs. Acceso</string>
+    <string name="tutorial_share_heavy">¡Bienvenido a la sección Compartir! Aquí puedes clonar el sistema IIAB COMPLETO (hasta varios GB) en otro dispositivo. Este proceso puede tardar horas, lo cual no es lo mismo que el acceso compartido, que es instantáneo.</string>    <string name="tutorial_share_light">¿Buscas acceso instantáneo? ☝️\nSi solo quieres que otros lean Wikipedia o usen los Mapas al instante, ¡inicia el servidor y comparte el código QR de aquí arriba!</string>
+    <string name="tutorial_share_dont_show">No volver a mostrar</string>
+    <string name="tutorial_share_got_it">¡Entendido!</string>
 </resources>

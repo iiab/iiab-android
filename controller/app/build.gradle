@@ -20,8 +20,8 @@ android {
 
         // 3. Version Control (OTA)
         // NOTE: With splits enabled, this number will be multiplied by 10 (e.g. 50 -> 500, 501, 502)
-        versionCode 51
-        versionName "v0.3.6.1beta"
+        versionCode 52
+        versionName "v0.3.6.2beta"
         setProperty("archivesBaseName", "$applicationId-$versionName")
 
         // 4. Supported architectures (NDK) - Dropping x86/x86_64
@@ -68,6 +68,18 @@ android {
             minifyEnabled false
             //signingConfig signingConfigs.release
         }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+        // Try to avoid clashes if Termux and our code contain duplicate licenses or metadata
+        pickFirst 'META-INF/LICENSE'
+        pickFirst 'META-INF/LICENSE.txt'
+        pickFirst 'META-INF/NOTICE'
+        pickFirst 'META-INF/NOTICE.txt'
+        pickFirst 'META-INF/DEPENDENCIES'
     }
 
     // 8. Dynamic Keystore Loading

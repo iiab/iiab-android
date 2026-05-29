@@ -229,6 +229,8 @@
     <string name="install_legend_maps">IIAB मानचित्र</string>
     <string name="install_legend_kiwix">विकिपीडिया</string>
     <string name="install_legend_free">मुक्त</string>
+    <string name="install_legend_wiki_plain">विकिपीडिया</string>
+    <string name="install_legend_wiki_lang">विकिपीडिया (%1$s)</string>
 
     <string name="install_msg_termux_missing">कृपया पहले बेस Debian सिस्टम इंस्टॉल करें।</string>
     <string name="install_adv_monitoring_title">उन्नत मॉनिटरिंग</string>
@@ -468,4 +470,9 @@
     <string name="qr_btn_close">बंद करें</string>
     <string name="qr_content_description">QR कोड</string>
     <string name="sync_share_status_init">सर्वर शुरू हो रहा है...</string>
+
+    <string name="tutorial_share_title">ट्रांसफर बनाम एक्सेस</string>
+    <string name="tutorial_share_heavy">शेयर सेक्शन में आपका स्वागत है! यहां आप पूरे IIAB सिस्टम (कई GB तक) को दूसरे डिवाइस पर क्लोन कर सकते हैं। इस प्रोसेस में घंटों लग सकते हैं, जो तुरंत शेयर एक्सेस जैसा नहीं है।</string>    <string name="tutorial_share_light">तुरंत एक्सेस चाहिए? ☝️\nअगर आप चाहते हैं कि दूसरे लोग तुरंत विकिपीडिया पढ़ें या मैप्स इस्तेमाल करें, तो सर्वर शुरू करें और QR कोड यहां शेयर करें!</string>
+    <string name="tutorial_share_dont_show">फिर से न दिखाएं</string>
+    <string name="tutorial_share_got_it">समझ गया!</string>
 </resources>

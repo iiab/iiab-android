@@ -702,7 +702,12 @@ public class DeployFragment extends Fragment {
 
                 double pOs = (selectedTier == null) ? 0.0 : projection.osSize;
                 double pMaps = (selectedTier == null) ? 0.0 : projection.mapsSize;
-                double pKiwix = (selectedTier == null) ? 0.0 : projection.kiwixSize;
+                // --- DETECT ARCHITECTURE ---
+                String arch = getTermuxArch();
+                boolean is64Bit = arch != null && arch.contains("64");
+
+                // --- FORCE KIWIX TO ZERO IN 32-BITS (change if kiwix gets support for 32bits somehow) ---
+                double pKiwix = (selectedTier == null || !is64Bit) ? 0.0 : projection.kiwixSize;
                 double pTotal = pOs + pMaps + pKiwix;
 
                 isStorageSafe = pTotal <= (freeSpaceGb - 5.0);
@@ -719,12 +724,34 @@ public class DeployFragment extends Fragment {
                     ViewGroup parent = (ViewGroup) txtLegendKiwix.getParent();
                     lblWiki = (TextView) parent.getChildAt(1);
                 }
-                if (lblWiki != null) {
+                // --- HIDE UI OF KIWIX IF IT IS 32-BITS ---
+                if (!is64Bit) {
+                    // We force "N/A" in the size text
+                    if (txtLegendKiwix != null) {
+                        txtLegendKiwix.setText(getString(R.string.install_msg_backup_na)); // Use the "N/A" string you already have
+                        txtLegendKiwix.setTextColor(ContextCompat.getColor(requireContext(), R.color.dash_text_secondary));
+                    }
+
+                    if (lblWiki != null) {
+                        lblWiki.setText(getString(R.string.install_legend_wiki_plain));
+                        // We apply gray
+                        lblWiki.setTextColor(ContextCompat.getColor(requireContext(), R.color.dash_text_secondary));
+                        // (Optional) We can cross it out to make it clear that it is disabled
+                        lblWiki.setPaintFlags(lblWiki.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+                    }
+
+                    // We hide the gear so it cannot interact
+                    if (btnKiwixSettings != null) btnKiwixSettings.setVisibility(View.GONE);
+                } else if (lblWiki != null) {
+                    // We clean the strikethrough (in case the view is recycled)
+                    lblWiki.setPaintFlags(lblWiki.getPaintFlags() & (~android.graphics.Paint.STRIKE_THRU_TEXT_FLAG));
+
+                    // Normal logic for 64-bit
                     if (chkCompanionData.isChecked()) {
-                        lblWiki.setText("Wikipedia (" + projection.resolvedLang.toUpperCase() + ")");
+                        lblWiki.setText(getString(R.string.install_legend_wiki_lang, projection.resolvedLang.toUpperCase()));
                         lblWiki.setTextColor(Color.parseColor("#2196F3"));
                     } else {
-                        lblWiki.setText("Wikipedia");
+                        lblWiki.setText(getString(R.string.install_legend_wiki_plain));
                         lblWiki.setTextColor(ContextCompat.getColor(requireContext(), R.color.dash_text_secondary));
                     }
                 }

@@ -3,11 +3,16 @@
     <color name="dash_bg_main">#121212</color>
     <color name="dash_bg_card">#242424</color>
     
-    <color name="dash_text_primary">#FAFAFA</color> <color name="dash_text_secondary">#BDBDBD</color> <color name="dash_text_inverted">#FFFFFF</color> <color name="dash_text_gauge_title">#CCCCCC</color> <color name="dash_module_bg">#242424</color>
+    <color name="dash_text_primary">#FAFAFA</color>
+    <color name="dash_text_secondary">#BDBDBD</color>
+    <color name="dash_text_inverted">#FFFFFF</color>
+    <color name="dash_text_gauge_title">#CCCCCC</color>
+    <color name="dash_module_bg">#242424</color>
     <color name="dash_module_text">#FFFFFF</color>
     <color name="dash_divider">#333333</color>
     <color name="dash_warning">#FFB300</color>
     <color name="dash_status_online">#4CAF50</color>
+    <color name="btn_primary">#2196F3</color>
 
     <color name="footer_text_color">#888888</color>
     

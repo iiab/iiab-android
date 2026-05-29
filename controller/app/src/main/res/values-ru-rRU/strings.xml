@@ -229,6 +229,8 @@
     <string name="install_legend_maps">Карты IIAB</string>
     <string name="install_legend_kiwix">Википедия</string>
     <string name="install_legend_free">Свободно</string>
+    <string name="install_legend_wiki_plain">Википедия</string>
+    <string name="install_legend_wiki_lang">Википедия (%1$s)</string>
 
     <string name="install_msg_termux_missing">Пожалуйста, сначала установите базовую систему Debian.</string>
     <string name="install_adv_monitoring_title">Расширенный мониторинг</string>
@@ -468,4 +470,9 @@
     <string name="qr_btn_close">Закрыть</string>
     <string name="qr_content_description">QR-код</string>
     <string name="sync_share_status_init">Запуск сервера...</string>
+
+    <string name="tutorial_share_title">Передача против доступа</string>
+    <string name="tutorial_share_heavy">Добро пожаловать в раздел «Поделиться»! Здесь вы можете клонировать ВСЮ систему IIAB (до нескольких гигабайт) на другое устройство. Этот процесс может занять несколько часов, что не то же самое, что мгновенный доступ к общему ресурсу.</string>    <string name="tutorial_share_light">Ищете мгновенный доступ? ☝️\nЕсли вы просто хотите, чтобы другие могли мгновенно читать Википедию или пользоваться Картовыми картами, запустите сервер и поделитесь QR-кодом здесь!</string>
+    <string name="tutorial_share_dont_show">Больше не показывать</string>
+    <string name="tutorial_share_got_it">Понял!</string>
 </resources>
